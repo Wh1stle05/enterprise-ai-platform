@@ -1,12 +1,12 @@
 """Knowledge base endpoints — CRUD + upload + search."""
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import get_current_user
-from app.models import KnowledgeBase, Document
+from app.models import Document, KnowledgeBase
 
 router = APIRouter()
 
@@ -71,8 +71,10 @@ async def upload_document(
     await db.refresh(doc)
 
     # Save file to disk
-    import aiofiles
     import os
+
+    import aiofiles
+
     from app.core.config import settings
 
     upload_path = os.path.join(settings.UPLOAD_DIR, str(kb.id))

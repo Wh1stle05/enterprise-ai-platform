@@ -1,22 +1,16 @@
-"""FastAPI application entry point."""
-
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.core.config import settings
-from app.core.database import engine, Base
 from app.api.v1 import api_router
+from app.core.config import settings
+from app.core.database import engine
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: create tables (dev only; use Alembic in production)
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
     yield
-    # Shutdown
     await engine.dispose()
 
 
@@ -27,7 +21,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -36,7 +29,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# API routes
 app.include_router(api_router, prefix="/api/v1")
 
 

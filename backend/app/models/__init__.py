@@ -1,15 +1,15 @@
 """SQLAlchemy ORM models."""
 
-from datetime import datetime, timezone
 import uuid
+from datetime import datetime, timezone
 
-from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Boolean, Integer, Enum as SAEnum
+from pgvector.sqlalchemy import Vector
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
-from pgvector.sqlalchemy import Vector
 
-from app.core.database import Base
 from app.core.config import settings
+from app.core.database import Base
 
 
 def utcnow():
