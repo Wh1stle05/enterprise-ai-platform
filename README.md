@@ -79,7 +79,7 @@ docker compose up -d
 |-------|----------|--------|
 | **V1** | Auth + Chat + History | ✅ Done |
 | **V2** | Knowledge Base + PDF/Word/Excel/Markdown Upload + ACL RAG | ✅ Done |
-| **V3** | Agent + Tool Calling + Docker Compose | 📝 Planned |
+| **V3** | Agent + Tool Calling + Docker Compose | ✅ Done |
 | **V4** | Kubernetes + Model Inference + Auto-scaling | 📝 Planned |
 | **V5** | Workflow + Approval | 📝 Planned |
 

@@ -59,6 +59,10 @@ services:
       RETRIEVAL_MIN_SCORE: "${RETRIEVAL_MIN_SCORE:-0.35}"
       UPLOAD_DIR: "/app/uploads"
       AUDIT_RETENTION_DAYS: "${AUDIT_RETENTION_DAYS:-90}"
+      AGENT_MAX_STEPS: "${AGENT_MAX_STEPS:-6}"
+      AGENT_MAX_ACTIVE_SECONDS: "${AGENT_MAX_ACTIVE_SECONDS:-20}"
+      TOOL_CONFIRMATION_TTL_SECONDS: "${TOOL_CONFIRMATION_TTL_SECONDS:-300}"
+      AGENT_TOOL_WHITELIST: "${AGENT_TOOL_WHITELIST:-[\"knowledge_search\",\"create_work_ticket\",\"query_inventory\",\"get_leave_balance\",\"submit_expense\"]}"
     depends_on:
       postgres:
         condition: service_healthy

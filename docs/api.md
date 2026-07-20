@@ -214,17 +214,35 @@ Send one user turn and receive the persisted user and assistant messages. The la
 {"content": "Hello"}
 ```
 
-**Response** `201 Created`
+**Response** `201 Created` (M3 agent turn)
 ```json
 {
-  "messages": [
-    {"id": "uuid", "role": "user", "content": "Hello", "created_at": "datetime"},
-    {"id": "uuid", "role": "assistant", "content": "Hi", "created_at": "datetime"}
-  ]
+  "run_id": "uuid", "status": "waiting_confirmation", "answer": null,
+  "tool_call": {
+    "id": "uuid", "tool_name": "submit_expense", "side_effect": "write",
+    "arguments": {"amount": 300, "currency": "CNY", "category": "supplies", "description": "Office supplies", "receipt_reference": "R-100"},
+    "impact": "Submit 300 CNY expense.", "status": "pending_confirmation",
+    "result": null, "error": null, "expires_at": "datetime"
+  }, "step_count": 2, "elapsed_ms": 12
 }
 ```
 
-`503` means `LLM_API_KEY` is not configured. `502` means the provider request failed.
+`status` is `running`, `waiting_confirmation`, `completed`, `limit_reached`, or `failed`.
+Read tools complete in the same turn. Write tools always pause before invocation. The client may
+display `tool_call.arguments` and `impact`, but cannot expand the server whitelist.
+
+### `GET /chat/conversations/{conversation_id}/tool-calls`
+
+Lists the current user's ordered tool activity, including read results and pending, denied,
+expired, or failed writes. Foreign conversations return `404`.
+
+### `POST /chat/tool-calls/{tool_call_id}/decision`
+
+Confirm or deny one pending write. The request is `{"confirm": true}` or `{"confirm": false}`.
+Confirmation executes the claimed handler once; denial never invokes it. An expired request is
+marked `expired` and is not executed. Repeat decisions return `409`; malformed requests return
+`422`; ownership violations return `404`; viewer mutation returns `403`; missing LLM configuration
+returns `503`; provider failures return `502`.
 
 ## Roles, audit, and discovery
 

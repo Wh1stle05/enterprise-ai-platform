@@ -19,6 +19,8 @@ docker compose exec backend alembic current
 ```
 
 Set `LLM_API_KEY` (or `OPENAI_API_KEY` for Compose), and optionally `LLM_BASE_URL` and `LLM_MODEL`, before sending chat messages. `AUDIT_RETENTION_DAYS` defaults to `90`.
+M3 uses `AGENT_MAX_STEPS=6`, `AGENT_MAX_ACTIVE_SECONDS=20`, `TOOL_CONFIRMATION_TTL_SECONDS=300`,
+and the server-owned `AGENT_TOOL_WHITELIST`. Waiting for confirmation does not consume active time.
 
 ## Local checks
 
@@ -85,6 +87,32 @@ knowledge base, then run:
 python scripts/evaluate_retrieval.py \
   --dataset evaluation/m2_sample.jsonl --top-k 5 \
   --output evaluation/results.json
+```
+
+## M3 Tool Workflow
+
+Tools are registered with `ToolDefinition` in `backend/app/tools` and composed by
+`build_default_registry()`. Each definition supplies a JSON Schema, `side_effect` (`read` or
+`write`), an async handler, and an impact formatter. Add a tool to the server configuration and
+registry together; clients cannot add tools through the API.
+
+Run the key-free M3 tests locally:
+
+```bash
+cd backend
+pytest tests/test_m3_flow.py tests/test_agent_loop.py tests/test_agent_api.py -q
+ruff check app tests
+alembic check
+```
+
+Manual smoke test: create or select an accessible knowledge base and ask the chat client to
+check its expense policy, then submit `300 CNY` for supplies with receipt `R-100`. Activity should
+show `knowledge_search` succeeded and `submit_expense` pending. Deny once to verify no expense ID,
+then repeat and confirm to receive an `EXP-` result. Audit rows can be inspected with:
+
+```sql
+SELECT action_type, tool_used, created_at FROM audit_logs
+WHERE action_type LIKE 'tool_call_%' ORDER BY created_at;
 ```
 
 Use `--min-recall` and `--min-citation-coverage` to make CI fail below agreed

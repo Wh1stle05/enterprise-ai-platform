@@ -4,10 +4,12 @@ import { useChat } from '../hooks/useChat'
 import ConversationList from '../components/ConversationList'
 import MessageList from '../components/MessageList'
 import { Link } from 'react-router-dom'
+import ToolActivity from '../components/ToolActivity'
+import ToolConfirmationDialog from '../components/ToolConfirmationDialog'
 
 export default function Chat() {
   const { user, logout } = useAuth()
-  const { conversations, messages, selectedId, loading, error, loadConversations, selectConversation, newConversation, sendMessage } = useChat()
+  const { conversations, messages, toolCalls, pendingCall, deciding, selectedId, loading, error, loadConversations, selectConversation, newConversation, sendMessage, reviewToolCall, closeReview, decide } = useChat()
   const [content, setContent] = useState('')
 
   useEffect(() => { loadConversations() }, [loadConversations])
@@ -43,6 +45,7 @@ export default function Chat() {
 
         <main className="flex-1 flex flex-col bg-white">
           <MessageList messages={messages} loading={loading && !!selectedId} error={error} />
+          <ToolActivity calls={toolCalls} onReview={reviewToolCall} />
           {selectedId && (
             <form
               className="border-t border-gray-200 p-4"
@@ -81,6 +84,7 @@ export default function Chat() {
           )}
         </main>
       </div>
+      <ToolConfirmationDialog call={pendingCall} deciding={deciding} onDecide={decide} onClose={closeReview} />
     </div>
   )
 }

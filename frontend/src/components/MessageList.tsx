@@ -40,7 +40,7 @@ export default function MessageList({ messages, loading, error }: Props) {
 
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-4">
-      {messages.map((m) => (
+      {messages.filter((m) => m.role !== 'tool').map((m) => (
         <div
           key={m.id}
           className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
