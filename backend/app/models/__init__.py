@@ -22,6 +22,7 @@ def new_uuid():
 
 # ---------- User ----------
 
+
 class User(Base):
     __tablename__ = "users"
 
@@ -36,7 +37,9 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), default=utcnow)
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
-    conversations = relationship("Conversation", back_populates="user", cascade="all, delete-orphan")
+    conversations = relationship(
+        "Conversation", back_populates="user", cascade="all, delete-orphan"
+    )
     audit_logs = relationship("AuditLog", back_populates="user")
 
 
@@ -51,12 +54,15 @@ class AuditLog(Base):
     tool_used = Column(String(128))
     ip_address = Column(String(64))
     retention_days = Column(Integer, nullable=False, default=90, server_default="90")
-    created_at = Column(DateTime(timezone=True), default=utcnow, server_default="now()", nullable=False)
+    created_at = Column(
+        DateTime(timezone=True), default=utcnow, server_default="now()", nullable=False
+    )
 
     user = relationship("User", back_populates="audit_logs")
 
 
 # ---------- Conversation / Chat ----------
+
 
 class Conversation(Base):
     __tablename__ = "conversations"
@@ -68,14 +74,21 @@ class Conversation(Base):
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     user = relationship("User", back_populates="conversations")
-    messages = relationship("Message", back_populates="conversation", cascade="all, delete-orphan", order_by="Message.created_at")
+    messages = relationship(
+        "Message",
+        back_populates="conversation",
+        cascade="all, delete-orphan",
+        order_by="Message.created_at",
+    )
 
 
 class Message(Base):
     __tablename__ = "messages"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
-    conversation_id = Column(UUID(as_uuid=True), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False)
+    conversation_id = Column(
+        UUID(as_uuid=True), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False
+    )
     role = Column(String(16), nullable=False)  # user / assistant / system
     content = Column(Text, nullable=False)
     metadata_ = Column("metadata", Text, default="{}")  # JSON blob for tool calls, citations, etc.
@@ -85,6 +98,7 @@ class Message(Base):
 
 
 # ---------- Knowledge Base ----------
+
 
 class KnowledgeBase(Base):
     __tablename__ = "knowledge_bases"
@@ -96,14 +110,18 @@ class KnowledgeBase(Base):
     created_at = Column(DateTime(timezone=True), default=utcnow)
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
-    documents = relationship("Document", back_populates="knowledge_base", cascade="all, delete-orphan")
+    documents = relationship(
+        "Document", back_populates="knowledge_base", cascade="all, delete-orphan"
+    )
 
 
 class Document(Base):
     __tablename__ = "documents"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
-    knowledge_base_id = Column(UUID(as_uuid=True), ForeignKey("knowledge_bases.id", ondelete="CASCADE"), nullable=False)
+    knowledge_base_id = Column(
+        UUID(as_uuid=True), ForeignKey("knowledge_bases.id", ondelete="CASCADE"), nullable=False
+    )
     filename = Column(String(512), nullable=False)
     file_type = Column(String(64))
     file_size = Column(Integer)
@@ -120,7 +138,9 @@ class DocumentChunk(Base):
     __tablename__ = "document_chunks"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
-    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False)
+    document_id = Column(
+        UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False
+    )
     chunk_index = Column(Integer, nullable=False)
     content = Column(Text, nullable=False)
     embedding = Column(Vector(settings.EMBEDDING_DIM))  # type: ignore

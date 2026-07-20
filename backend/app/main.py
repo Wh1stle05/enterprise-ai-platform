@@ -4,10 +4,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1 import api_router
-from app.core.config import settings
-from app.core.database import engine
-from app.core.database import async_session_factory
 from app.core.audit import purge_expired_logs
+from app.core.config import settings
+from app.core.database import async_session_factory, engine
 from app.middleware.audit import AuditMiddleware
 
 

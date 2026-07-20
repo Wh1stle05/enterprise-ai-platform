@@ -12,9 +12,7 @@ class LLMConfigurationError(RuntimeError):
     """Raised when the LLM cannot be called with the configured settings."""
 
 
-async def complete_chat(
-    messages: Sequence[dict[str, str]], *, client: Any | None = None
-) -> str:
+async def complete_chat(messages: Sequence[dict[str, str]], *, client: Any | None = None) -> str:
     if not settings.LLM_API_KEY:
         raise LLMConfigurationError("LLM API key is not configured")
     client = client or AsyncOpenAI(

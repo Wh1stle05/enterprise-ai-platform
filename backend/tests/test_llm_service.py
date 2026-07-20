@@ -1,5 +1,6 @@
-import pytest
 from types import SimpleNamespace
+
+import pytest
 
 from app.core.config import settings
 from app.services.llm_service import LLMConfigurationError, complete_chat

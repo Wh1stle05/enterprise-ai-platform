@@ -4,7 +4,6 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.llm_service import complete_chat
 from app.models import Conversation, Message
 from app.schemas.chat import (
     ConversationCreate,
@@ -12,6 +11,7 @@ from app.schemas.chat import (
     ConversationResponse,
     MessageResponse,
 )
+from app.services.llm_service import complete_chat
 
 
 async def list_conversations(
@@ -87,7 +87,9 @@ async def send_message(
     uid = UUID(user_id)
     cid = UUID(conversation_id)
     conversation = (
-        await db.execute(select(Conversation).where(Conversation.id == cid, Conversation.user_id == uid))
+        await db.execute(
+            select(Conversation).where(Conversation.id == cid, Conversation.user_id == uid)
+        )
     ).scalar_one_or_none()
     if not conversation:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
@@ -96,13 +98,17 @@ async def send_message(
     db.add(user_message)
     await db.flush()
     history_rows = (
-        await db.execute(
-            select(Message)
-            .where(Message.conversation_id == cid)
-            .order_by(Message.created_at, Message.id)
-            .limit(20)
+        (
+            await db.execute(
+                select(Message)
+                .where(Message.conversation_id == cid)
+                .order_by(Message.created_at, Message.id)
+                .limit(20)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     assistant_content = await complete_chat(
         [{"role": message.role, "content": message.content} for message in history_rows]
     )
@@ -118,7 +124,9 @@ async def delete_conversation(conversation_id: str, user_id: str, db: AsyncSessi
     cid = UUID(conversation_id)
     uid = UUID(user_id)
     conversation = (
-        await db.execute(select(Conversation).where(Conversation.id == cid, Conversation.user_id == uid))
+        await db.execute(
+            select(Conversation).where(Conversation.id == cid, Conversation.user_id == uid)
+        )
     ).scalar_one_or_none()
     if not conversation:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")

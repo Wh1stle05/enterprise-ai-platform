@@ -2,6 +2,30 @@
 
 Base URL: `/api/v1`
 
+## Curl quick start
+
+```bash
+curl -X POST http://localhost:8000/api/v1/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"alice","email":"alice@example.com","password":"secret123"}'
+
+curl -X POST http://localhost:8000/api/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"alice","password":"secret123"}'
+
+TOKEN='paste-access-token'
+curl http://localhost:8000/api/v1/auth/me -H "Authorization: Bearer $TOKEN"
+curl http://localhost:8000/api/v1/chat/conversations -H "Authorization: Bearer $TOKEN"
+curl -X POST http://localhost:8000/api/v1/chat/conversations \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{}'
+curl -X POST http://localhost:8000/api/v1/chat/conversations/CONVERSATION_ID/messages \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"content":"Hello"}'
+curl http://localhost:8000/api/v1/chat/conversations/CONVERSATION_ID/messages \
+  -H "Authorization: Bearer $TOKEN"
+curl -X DELETE http://localhost:8000/api/v1/chat/conversations/CONVERSATION_ID \
+  -H "Authorization: Bearer $TOKEN"
+```
+
 ---
 
 ## Health
@@ -93,6 +117,7 @@ Authorization: Bearer <token>
   "id": "uuid",
   "username": "string",
   "email": "string",
+  "role": "user | admin | viewer",
   "display_name": "string | null",
   "is_superuser": false,
   "created_at": "datetime (ISO 8601)"
@@ -173,6 +198,41 @@ Get all messages in a conversation (only messages belonging to the current user)
 ```
 
 Returns empty array `[]` if the conversation doesn't exist or has no messages.
+
+### `DELETE /chat/conversations/{conversation_id}`
+
+Delete an owned conversation. Users with the `viewer` role receive `403`; a conversation owned by another user returns `404`.
+
+**Response** `204 No Content`
+
+### `POST /chat/conversations/{conversation_id}/messages`
+
+Send one user turn and receive the persisted user and assistant messages. The last 20 messages are supplied to the configured OpenAI-compatible model.
+
+**Request Body**
+```json
+{"content": "Hello"}
+```
+
+**Response** `201 Created`
+```json
+{
+  "messages": [
+    {"id": "uuid", "role": "user", "content": "Hello", "created_at": "datetime"},
+    {"id": "uuid", "role": "assistant", "content": "Hi", "created_at": "datetime"}
+  ]
+}
+```
+
+`503` means `LLM_API_KEY` is not configured. `502` means the provider request failed.
+
+## Roles, audit, and discovery
+
+JWTs authenticate users, but authorization reads the current `role` from the database. Missing or invalid credentials return `401`. A valid `viewer` credential may read profile, conversation, and message history, but write operations return `403`. `admin` and `user` may create, send, and delete their own conversations.
+
+Audit records are redacted recursively for keys matching `password`, `secret`, `token`, `api_key`, and `Authorization`. Set `AUDIT_RETENTION_DAYS` (default `90`) to control retention; expired records are purged during application startup. Audit persistence is fail-open and never includes bearer tokens.
+
+Interactive documentation is available at `GET /docs`; the machine-readable contract is at `GET /openapi.json`.
 
 ---
 

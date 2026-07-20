@@ -18,11 +18,19 @@ async def list_knowledge_bases(
 ):
     """List all knowledge bases for the current user."""
     result = await db.execute(
-        select(KnowledgeBase).where(KnowledgeBase.user_id == payload["sub"]).order_by(KnowledgeBase.updated_at.desc())
+        select(KnowledgeBase)
+        .where(KnowledgeBase.user_id == payload["sub"])
+        .order_by(KnowledgeBase.updated_at.desc())
     )
     kbs = result.scalars().all()
     return [
-        {"id": str(kb.id), "name": kb.name, "description": kb.description, "document_count": 0, "created_at": kb.created_at.isoformat()}
+        {
+            "id": str(kb.id),
+            "name": kb.name,
+            "description": kb.description,
+            "document_count": 0,
+            "created_at": kb.created_at.isoformat(),
+        }
         for kb in kbs
     ]
 
@@ -52,11 +60,15 @@ async def upload_document(
     """Upload a document to a knowledge base."""
     # Verify KB exists and belongs to user
     result = await db.execute(
-        select(KnowledgeBase).where(KnowledgeBase.id == kb_id, KnowledgeBase.user_id == payload["sub"])
+        select(KnowledgeBase).where(
+            KnowledgeBase.id == kb_id, KnowledgeBase.user_id == payload["sub"]
+        )
     )
     kb = result.scalar_one_or_none()
     if not kb:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge base not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge base not found"
+        )
 
     content = await file.read()
     doc = Document(
@@ -83,4 +95,9 @@ async def upload_document(
     async with aiofiles.open(file_path, "wb") as f:
         await f.write(content)
 
-    return {"id": str(doc.id), "filename": doc.filename, "status": doc.status, "file_size": doc.file_size}
+    return {
+        "id": str(doc.id),
+        "filename": doc.filename,
+        "status": doc.status,
+        "file_size": doc.file_size,
+    }

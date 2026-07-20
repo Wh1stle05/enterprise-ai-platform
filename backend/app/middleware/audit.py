@@ -27,7 +27,13 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 token = authorization[7:]
                 payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
                 user_id = UUID(payload["sub"])
-            action = "query" if request.method == "GET" else "admin" if "/users" in request.url.path else "request"
+            action = (
+                "query"
+                if request.method == "GET"
+                else "admin"
+                if "/users" in request.url.path
+                else "request"
+            )
             factory = getattr(request.app.state, "audit_session_factory", async_session_factory)
             async with factory() as db:
                 await record_audit(

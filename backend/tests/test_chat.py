@@ -117,7 +117,9 @@ class TestMessages:
     async def test_send_two_turns_passes_history_to_llm(self, client: AsyncClient):
         headers = await self._auth_header(client, suffix="turns")
         conv_id = await self._create_conversation(client, headers)
-        with patch("app.services.chat_service.complete_chat", new=AsyncMock(return_value="pong")) as llm:
+        with patch(
+            "app.services.chat_service.complete_chat", new=AsyncMock(return_value="pong")
+        ) as llm:
             first = await client.post(
                 f"{CONVERSATIONS_URL}/{conv_id}/messages",
                 json={"content": "ping"},

@@ -4,14 +4,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.security import get_current_user, require_roles
 from app.models import User
-from app.services.llm_service import LLMConfigurationError
 from app.schemas.chat import (
     ConversationCreate,
     ConversationListItem,
     ConversationResponse,
     MessageCreate,
-    MessageSendResponse,
     MessageResponse,
+    MessageSendResponse,
 )
 from app.services.chat_service import (
     create_conversation,
@@ -20,6 +19,7 @@ from app.services.chat_service import (
     list_messages,
     send_message,
 )
+from app.services.llm_service import LLMConfigurationError
 
 router = APIRouter()
 

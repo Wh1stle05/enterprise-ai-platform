@@ -37,10 +37,12 @@ def test_redact_nested_and_truncates_strings():
 @pytest.mark.asyncio
 async def test_purge_expired_logs(db_session):
     now = datetime.now(timezone.utc)
-    db_session.add_all([
-        AuditLog(action_type="query", created_at=now - timedelta(days=91), retention_days=90),
-        AuditLog(action_type="query", created_at=now - timedelta(days=1), retention_days=90),
-    ])
+    db_session.add_all(
+        [
+            AuditLog(action_type="query", created_at=now - timedelta(days=91), retention_days=90),
+            AuditLog(action_type="query", created_at=now - timedelta(days=1), retention_days=90),
+        ]
+    )
     await db_session.commit()
     await purge_expired_logs(db_session, now=now)
     rows = (await db_session.execute(select(AuditLog))).scalars().all()
