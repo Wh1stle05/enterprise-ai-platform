@@ -4,7 +4,17 @@ import uuid
 from datetime import datetime, timezone
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -113,6 +123,33 @@ class KnowledgeBase(Base):
     documents = relationship(
         "Document", back_populates="knowledge_base", cascade="all, delete-orphan"
     )
+    acl_entries = relationship(
+        "KnowledgeBaseACL", back_populates="knowledge_base", cascade="all, delete-orphan"
+    )
+
+
+class KnowledgeBaseACL(Base):
+    __tablename__ = "knowledge_base_acl"
+
+    knowledge_base_id = Column(
+        UUID(as_uuid=True), ForeignKey("knowledge_bases.id", ondelete="CASCADE"), primary_key=True
+    )
+    subject_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    access_level = Column(String(16), nullable=False)
+    created_at = Column(
+        DateTime(timezone=True), default=utcnow, server_default="now()", nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "access_level IN ('owner','editor','viewer')", name="ck_kb_acl_access_level"
+        ),
+    )
+
+    knowledge_base = relationship("KnowledgeBase", back_populates="acl_entries")
+    subject = relationship("User")
 
 
 class Document(Base):
@@ -128,7 +165,21 @@ class Document(Base):
     status = Column(String(32), default="pending")  # pending / processing / ready / failed
     content_text = Column(Text, default="")  # extracted plain text
     chunk_count = Column(Integer, default=0)
+    storage_uri = Column(String(1024), nullable=False, default="")
+    checksum = Column(String(64), nullable=False, default="")
+    parser_version = Column(String(64), nullable=False, default="")
+    embedding_model = Column(String(128), nullable=False, default="")
+    embedding_dim = Column(Integer, nullable=False, default=settings.EMBEDDING_DIM)
+    error_message = Column(Text)
+    processed_at = Column(DateTime(timezone=True))
     created_at = Column(DateTime(timezone=True), default=utcnow)
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending','processing','ready','failed')", name="ck_documents_status"
+        ),
+        UniqueConstraint("knowledge_base_id", "checksum", name="uq_documents_kb_checksum"),
+    )
 
     knowledge_base = relationship("KnowledgeBase", back_populates="documents")
     chunks = relationship("DocumentChunk", back_populates="document", cascade="all, delete-orphan")
@@ -144,6 +195,11 @@ class DocumentChunk(Base):
     chunk_index = Column(Integer, nullable=False)
     content = Column(Text, nullable=False)
     embedding = Column(Vector(settings.EMBEDDING_DIM))  # type: ignore
+    source_locator = Column(String(256), nullable=False, default="")
     created_at = Column(DateTime(timezone=True), default=utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("document_id", "chunk_index", name="uq_document_chunks_index"),
+    )
 
     document = relationship("Document", back_populates="chunks")
