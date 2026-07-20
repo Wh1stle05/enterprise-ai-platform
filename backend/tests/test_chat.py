@@ -1,3 +1,5 @@
+from unittest.mock import AsyncMock, patch
+
 from httpx import AsyncClient
 
 REGISTER_URL = "/api/v1/auth/register"
@@ -35,6 +37,18 @@ class TestConversations:
         resp = await client.get(CONVERSATIONS_URL, headers=headers)
         assert resp.status_code == 200
         assert resp.json() == []
+
+    async def test_send_message_persists_user_and_assistant(self, client: AsyncClient):
+        headers = await self._auth_header(client)
+        conv_id = (await client.post(CONVERSATIONS_URL, json={}, headers=headers)).json()["id"]
+        with patch("app.services.chat_service.complete_chat", new=AsyncMock(return_value="pong")):
+            resp = await client.post(
+                f"{CONVERSATIONS_URL}/{conv_id}/messages",
+                json={"content": "hello"},
+                headers=headers,
+            )
+        assert resp.status_code == 201
+        assert [m["role"] for m in resp.json()["messages"]] == ["user", "assistant"]
 
     async def test_list_conversations(self, client: AsyncClient):
         headers = await self._auth_header(client)

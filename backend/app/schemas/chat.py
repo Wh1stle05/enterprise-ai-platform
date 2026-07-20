@@ -32,3 +32,11 @@ class MessageResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class MessageCreate(BaseModel):
+    content: str = Field(..., min_length=1, max_length=16_000)
+
+
+class MessageSendResponse(BaseModel):
+    messages: list[MessageResponse]

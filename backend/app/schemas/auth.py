@@ -2,6 +2,9 @@ from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field
+from typing import Literal
+
+Role = Literal["admin", "user", "viewer"]
 
 
 class RegisterRequest(BaseModel):
@@ -19,6 +22,7 @@ class UserResponse(BaseModel):
     id: UUID
     username: str
     email: str
+    role: Role = "user"
     display_name: str | None = None
     is_superuser: bool = False
     created_at: datetime

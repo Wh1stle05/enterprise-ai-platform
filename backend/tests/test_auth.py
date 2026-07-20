@@ -14,6 +14,7 @@ class TestRegister:
         assert data["token_type"] == "bearer"
         assert data["user"]["username"] == "testuser"
         assert data["user"]["email"] == "test@example.com"
+        assert data["user"]["role"] == "user"
         assert "access_token" in data
         assert "id" in data["user"]
 
