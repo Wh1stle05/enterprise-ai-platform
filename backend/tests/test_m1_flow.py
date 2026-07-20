@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -26,7 +27,8 @@ async def test_m1_core_flow(client: AsyncClient, db_session):
     conversation_id = conversation.json()["id"]
 
     with patch(
-        "app.services.chat_service.complete_chat", new=AsyncMock(return_value="assistant reply")
+        "app.services.chat_service.start_agent_turn",
+        new=AsyncMock(return_value=SimpleNamespace(answer="assistant reply")),
     ):
         for content in ("first", "second"):
             response = await client.post(

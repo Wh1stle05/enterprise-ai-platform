@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 from httpx import AsyncClient
@@ -41,7 +42,10 @@ class TestConversations:
     async def test_send_message_persists_user_and_assistant(self, client: AsyncClient):
         headers = await self._auth_header(client)
         conv_id = (await client.post(CONVERSATIONS_URL, json={}, headers=headers)).json()["id"]
-        with patch("app.services.chat_service.complete_chat", new=AsyncMock(return_value="pong")):
+        with patch(
+            "app.services.chat_service.start_agent_turn",
+            new=AsyncMock(return_value=SimpleNamespace(answer="pong")),
+        ):
             resp = await client.post(
                 f"{CONVERSATIONS_URL}/{conv_id}/messages",
                 json={"content": "hello"},
@@ -114,12 +118,13 @@ class TestMessages:
         assert resp.status_code == 200
         assert resp.json() == []
 
-    async def test_send_two_turns_passes_history_to_llm(self, client: AsyncClient):
+    async def test_send_two_turns_passes_latest_history_to_agent(self, client: AsyncClient):
         headers = await self._auth_header(client, suffix="turns")
         conv_id = await self._create_conversation(client, headers)
         with patch(
-            "app.services.chat_service.complete_chat", new=AsyncMock(return_value="pong")
-        ) as llm:
+            "app.services.chat_service.start_agent_turn",
+            new=AsyncMock(return_value=SimpleNamespace(answer="pong")),
+        ) as agent:
             first = await client.post(
                 f"{CONVERSATIONS_URL}/{conv_id}/messages",
                 json={"content": "ping"},
@@ -132,12 +137,31 @@ class TestMessages:
             )
         assert first.status_code == 201
         assert second.status_code == 201
-        assert llm.await_args_list[0].args[0] == [{"role": "user", "content": "ping"}]
-        assert llm.await_args_list[1].args[0] == [
+        assert agent.await_args_list[0].kwargs["history"] == [{"role": "user", "content": "ping"}]
+        assert agent.await_args_list[1].kwargs["history"] == [
             {"role": "user", "content": "ping"},
             {"role": "assistant", "content": "pong"},
             {"role": "user", "content": "again"},
         ]
+
+    async def test_send_message_caps_agent_history_at_twenty_messages(self, client: AsyncClient):
+        headers = await self._auth_header(client, suffix="history-cap")
+        conv_id = await self._create_conversation(client, headers)
+        with patch(
+            "app.services.chat_service.start_agent_turn",
+            new=AsyncMock(return_value=SimpleNamespace(answer="pong")),
+        ) as agent:
+            for index in range(11):
+                response = await client.post(
+                    f"{CONVERSATIONS_URL}/{conv_id}/messages",
+                    json={"content": f"message-{index}"},
+                    headers=headers,
+                )
+                assert response.status_code == 201
+        history = agent.await_args_list[-1].kwargs["history"]
+        assert len(history) == 20
+        assert history[0] == {"role": "assistant", "content": "pong"}
+        assert history[-1] == {"role": "user", "content": "message-10"}
 
     async def test_delete_conversation_is_owner_only(self, client: AsyncClient):
         headers_a = await self._auth_header(client, suffix="delete-a")

@@ -4,6 +4,8 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agent.defaults import build_default_registry
+from app.agent.loop import start_agent_turn
 from app.models import Conversation, Message
 from app.schemas.chat import (
     ConversationCreate,
@@ -11,7 +13,6 @@ from app.schemas.chat import (
     ConversationResponse,
     MessageResponse,
 )
-from app.services.llm_service import complete_chat
 
 
 async def list_conversations(
@@ -98,21 +99,23 @@ async def send_message(
     db.add(user_message)
     await db.flush()
     history_rows = (
-        (
-            await db.execute(
-                select(Message)
-                .where(Message.conversation_id == cid)
-                .order_by(Message.created_at, Message.id)
-                .limit(20)
-            )
+        await db.execute(
+            select(Message)
+            .where(Message.conversation_id == cid)
+            .order_by(Message.created_at.desc(), Message.id.desc())
+            .limit(20)
         )
-        .scalars()
-        .all()
+    ).scalars().all()
+    result = await start_agent_turn(
+        db,
+        build_default_registry(),
+        cid,
+        uid,
+        content,
+        history=[{"role": message.role, "content": message.content} for message in reversed(history_rows)],
     )
-    assistant_content = await complete_chat(
-        [{"role": message.role, "content": message.content} for message in history_rows]
-    )
-    db.add(Message(conversation_id=cid, role="assistant", content=assistant_content))
+    if result.answer:
+        db.add(Message(conversation_id=cid, role="assistant", content=result.answer))
     conversation.updated_at = datetime.now(timezone.utc)
     await db.flush()
     return await list_messages(conversation_id, user_id, db)
