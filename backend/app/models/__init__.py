@@ -32,10 +32,28 @@ class User(Base):
     display_name = Column(String(128), default="")
     is_active = Column(Boolean, default=True)
     is_superuser = Column(Boolean, default=False)
+    role = Column(String(16), nullable=False, default="user", server_default="user", index=True)
     created_at = Column(DateTime(timezone=True), default=utcnow)
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     conversations = relationship("Conversation", back_populates="user", cascade="all, delete-orphan")
+    audit_logs = relationship("AuditLog", back_populates="user")
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    action_type = Column(String(32), nullable=False)
+    input = Column(Text)
+    output = Column(Text)
+    tool_used = Column(String(128))
+    ip_address = Column(String(64))
+    retention_days = Column(Integer, nullable=False, default=90, server_default="90")
+    created_at = Column(DateTime(timezone=True), default=utcnow, server_default="now()", nullable=False)
+
+    user = relationship("User", back_populates="audit_logs")
 
 
 # ---------- Conversation / Chat ----------

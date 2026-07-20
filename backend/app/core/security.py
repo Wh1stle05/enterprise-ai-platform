@@ -2,13 +2,18 @@
 
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
 from app.core.config import settings
+from app.core.database import get_db
+from app.models import User
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
@@ -22,9 +27,11 @@ def hash_password(plain: str) -> str:
     return pwd_context.hash(plain)
 
 
-def create_access_token(sub: str, expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(sub: str, expires_delta: Optional[timedelta] = None, role: str | None = None) -> str:
     expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
     payload = {"sub": sub, "exp": expire, "iat": datetime.now(timezone.utc)}
+    if role:
+        payload["role"] = role
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
@@ -39,6 +46,25 @@ def decode_access_token(token: str) -> dict:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
 
 
-async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
-    """FastAPI dependency: returns the current user payload from JWT."""
-    return decode_access_token(token)
+async def get_current_user(
+    token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)
+) -> User:
+    payload = decode_access_token(token)
+    try:
+        user_id = UUID(payload["sub"])
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid user")
+    result = await db.execute(select(User).where(User.id == user_id, User.is_active.is_(True)))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid user")
+    return user
+
+
+def require_roles(*roles: str):
+    async def dependency(user: User = Depends(get_current_user)) -> User:
+        if user.role not in roles:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+        return user
+
+    return dependency

@@ -22,10 +22,6 @@ async def login_endpoint(req: LoginRequest, db: AsyncSession = Depends(get_db)):
 
 @router.get("/me", response_model=UserResponse)
 async def get_me(
-    payload: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    user = Depends(get_current_user),
 ):
-    user = await get_user_by_id(payload["sub"], db)
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return UserResponse.model_validate(user)

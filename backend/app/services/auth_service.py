@@ -28,7 +28,7 @@ async def register(req: RegisterRequest, db: AsyncSession) -> TokenResponse:
     await db.flush()
     await db.refresh(user)
 
-    token = create_access_token(sub=str(user.id))
+    token = create_access_token(sub=str(user.id), role=user.role)
     return TokenResponse(
         access_token=token,
         user=UserResponse.model_validate(user),
@@ -45,7 +45,7 @@ async def login(req: LoginRequest, db: AsyncSession) -> TokenResponse:
             detail="Invalid credentials",
         )
 
-    token = create_access_token(sub=str(user.id))
+    token = create_access_token(sub=str(user.id), role=user.role)
     return TokenResponse(
         access_token=token,
         user=UserResponse.model_validate(user),
