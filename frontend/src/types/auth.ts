@@ -4,6 +4,7 @@ export interface User {
   email: string
   display_name: string | null
   is_superuser: boolean
+  role: 'admin' | 'user' | 'viewer'
   created_at: string
 }
 

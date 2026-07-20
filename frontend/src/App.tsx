@@ -4,6 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Chat from './pages/Chat'
+import Knowledge from './pages/Knowledge'
 
 export default function App() {
   return (
@@ -15,6 +16,7 @@ export default function App() {
           <Route element={<ProtectedRoute />}>
             <Route path="/chat" element={<Chat />} />
             <Route path="/chat/:id" element={<Chat />} />
+            <Route path="/knowledge" element={<Knowledge />} />
           </Route>
           <Route path="*" element={<Navigate to="/chat" replace />} />
         </Routes>

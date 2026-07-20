@@ -3,6 +3,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useChat } from '../hooks/useChat'
 import ConversationList from '../components/ConversationList'
 import MessageList from '../components/MessageList'
+import { Link } from 'react-router-dom'
 
 export default function Chat() {
   const { user, logout } = useAuth()
@@ -19,7 +20,8 @@ export default function Chat() {
   return (
     <div className="flex flex-col h-screen">
       <header className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200 shadow-sm">
-        <h1 className="text-lg font-semibold text-gray-800">Enterprise AI Platform</h1>
+          <h1 className="text-lg font-semibold text-gray-800">Enterprise AI Platform</h1>
+          <Link to="/knowledge" className="text-sm text-blue-700">Knowledge</Link>
         <div className="flex items-center gap-3">
           <span className="text-sm text-gray-500">{user?.username}</span>
           <button
