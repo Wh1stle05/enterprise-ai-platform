@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { useChat } from '../hooks/useChat'
 import ConversationList from '../components/ConversationList'
@@ -6,7 +6,8 @@ import MessageList from '../components/MessageList'
 
 export default function Chat() {
   const { user, logout } = useAuth()
-  const { conversations, messages, selectedId, loading, loadConversations, selectConversation, newConversation } = useChat()
+  const { conversations, messages, selectedId, loading, error, loadConversations, selectConversation, newConversation, sendMessage } = useChat()
+  const [content, setContent] = useState('')
 
   useEffect(() => { loadConversations() }, [loadConversations])
 
@@ -39,7 +40,43 @@ export default function Chat() {
         />
 
         <main className="flex-1 flex flex-col bg-white">
-          <MessageList messages={messages} loading={loading && !!selectedId} />
+          <MessageList messages={messages} loading={loading && !!selectedId} error={error} />
+          {selectedId && (
+            <form
+              className="border-t border-gray-200 p-4"
+              onSubmit={(event) => {
+                event.preventDefault()
+                if (!content.trim() || loading) return
+                void sendMessage(content.trim())
+                setContent('')
+              }}
+            >
+              <div className="flex gap-2">
+                <textarea
+                  value={content}
+                  onChange={(event) => setContent(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && !event.shiftKey) {
+                      event.preventDefault()
+                      event.currentTarget.form?.requestSubmit()
+                    }
+                  }}
+                  disabled={loading}
+                  rows={2}
+                  placeholder="Write a message..."
+                  className="flex-1 resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                />
+                <button
+                  type="submit"
+                  disabled={loading || !content.trim()}
+                  className="self-end rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Send
+                </button>
+              </div>
+              {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
+            </form>
+          )}
         </main>
       </div>
     </div>

@@ -4,9 +4,10 @@ import type { Message } from '../types/chat'
 interface Props {
   messages: Message[]
   loading: boolean
+  error?: string | null
 }
 
-export default function MessageList({ messages, loading }: Props) {
+export default function MessageList({ messages, loading, error }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -17,6 +18,14 @@ export default function MessageList({ messages, loading }: Props) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <p className="text-gray-400">Loading messages...</p>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-6">
+        <p className="text-red-500">{error}</p>
       </div>
     )
   }

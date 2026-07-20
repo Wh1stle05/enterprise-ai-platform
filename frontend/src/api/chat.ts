@@ -15,3 +15,8 @@ export async function listMessages(conversationId: string): Promise<Message[]> {
   const res = await client.get(`/chat/conversations/${conversationId}/messages`)
   return res.data
 }
+
+export async function sendMessage(id: string, content: string): Promise<Message[]> {
+  const res = await client.post(`/chat/conversations/${id}/messages`, { content })
+  return res.data.messages
+}
