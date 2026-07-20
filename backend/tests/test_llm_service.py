@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.core.config import settings
-from app.services.llm_service import LLMConfigurationError, complete_chat
+from app.services.llm_service import LLMConfigurationError, complete_chat, get_llm_client
 
 
 class FakeCompletions:
@@ -16,8 +16,7 @@ class FakeCompletions:
 
 
 @pytest.mark.asyncio
-async def test_complete_chat_uses_model_and_history(monkeypatch):
-    monkeypatch.setattr(settings, "LLM_API_KEY", "test-key")
+async def test_complete_chat_uses_model_and_history():
     completions = FakeCompletions()
     fake_client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
     result = await complete_chat([{"role": "user", "content": "ping"}], client=fake_client)
@@ -26,7 +25,15 @@ async def test_complete_chat_uses_model_and_history(monkeypatch):
     assert completions.calls[0]["messages"] == [{"role": "user", "content": "ping"}]
 
 
+def test_get_llm_client_returns_injected_client_without_api_key():
+    fake_client = object()
+
+    assert get_llm_client(fake_client) is fake_client
+
+
 @pytest.mark.asyncio
-async def test_missing_key_is_deterministic():
+async def test_complete_chat_requires_key_when_client_is_not_injected(monkeypatch):
+    monkeypatch.setattr(settings, "LLM_API_KEY", None)
+
     with pytest.raises(LLMConfigurationError):
         await complete_chat([{"role": "user", "content": "ping"}])
