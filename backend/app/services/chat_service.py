@@ -1,8 +1,10 @@
+from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.llm_service import complete_chat
 from app.models import Conversation, Message
 from app.schemas.chat import (
     ConversationCreate,
@@ -72,3 +74,53 @@ async def list_messages(
     )
     msgs = result.scalars().all()
     return [MessageResponse.model_validate(m) for m in msgs]
+
+
+async def send_message(
+    conversation_id: str,
+    user_id: str,
+    content: str,
+    db: AsyncSession,
+) -> list[MessageResponse]:
+    from fastapi import HTTPException, status
+
+    uid = UUID(user_id)
+    cid = UUID(conversation_id)
+    conversation = (
+        await db.execute(select(Conversation).where(Conversation.id == cid, Conversation.user_id == uid))
+    ).scalar_one_or_none()
+    if not conversation:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
+
+    user_message = Message(conversation_id=cid, role="user", content=content)
+    db.add(user_message)
+    await db.flush()
+    history_rows = (
+        await db.execute(
+            select(Message)
+            .where(Message.conversation_id == cid)
+            .order_by(Message.created_at, Message.id)
+            .limit(20)
+        )
+    ).scalars().all()
+    assistant_content = await complete_chat(
+        [{"role": message.role, "content": message.content} for message in history_rows]
+    )
+    db.add(Message(conversation_id=cid, role="assistant", content=assistant_content))
+    conversation.updated_at = datetime.now(timezone.utc)
+    await db.flush()
+    return await list_messages(conversation_id, user_id, db)
+
+
+async def delete_conversation(conversation_id: str, user_id: str, db: AsyncSession) -> None:
+    from fastapi import HTTPException, status
+
+    cid = UUID(conversation_id)
+    uid = UUID(user_id)
+    conversation = (
+        await db.execute(select(Conversation).where(Conversation.id == cid, Conversation.user_id == uid))
+    ).scalar_one_or_none()
+    if not conversation:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
+    await db.delete(conversation)
+    await db.flush()

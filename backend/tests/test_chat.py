@@ -113,3 +113,35 @@ class TestMessages:
         )
         assert resp.status_code == 200
         assert resp.json() == []
+
+    async def test_send_two_turns_passes_history_to_llm(self, client: AsyncClient):
+        headers = await self._auth_header(client, suffix="turns")
+        conv_id = await self._create_conversation(client, headers)
+        with patch("app.services.chat_service.complete_chat", new=AsyncMock(return_value="pong")) as llm:
+            first = await client.post(
+                f"{CONVERSATIONS_URL}/{conv_id}/messages",
+                json={"content": "ping"},
+                headers=headers,
+            )
+            second = await client.post(
+                f"{CONVERSATIONS_URL}/{conv_id}/messages",
+                json={"content": "again"},
+                headers=headers,
+            )
+        assert first.status_code == 201
+        assert second.status_code == 201
+        assert llm.await_args_list[0].args[0] == [{"role": "user", "content": "ping"}]
+        assert llm.await_args_list[1].args[0] == [
+            {"role": "user", "content": "ping"},
+            {"role": "assistant", "content": "pong"},
+            {"role": "user", "content": "again"},
+        ]
+
+    async def test_delete_conversation_is_owner_only(self, client: AsyncClient):
+        headers_a = await self._auth_header(client, suffix="delete-a")
+        conv_id = await self._create_conversation(client, headers_a)
+        headers_b = await self._auth_header(client, suffix="delete-b")
+        response = await client.delete(f"{CONVERSATIONS_URL}/{conv_id}", headers=headers_b)
+        assert response.status_code == 404
+        response = await client.delete(f"{CONVERSATIONS_URL}/{conv_id}", headers=headers_a)
+        assert response.status_code == 204
