@@ -18,6 +18,8 @@ from app.schemas.knowledge import (
     DocumentResponse,
     KnowledgeBaseCreate,
     KnowledgeBaseResponse,
+    SearchHitResponse,
+    SearchRequest,
 )
 from app.services.file_storage import (
     EmptyUploadError,
@@ -33,6 +35,7 @@ from app.services.knowledge_service import (
     list_knowledge_bases,
 )
 from app.tasks.document_tasks import process_document_task
+from app.services.retrieval_service import search_chunks
 
 router = APIRouter()
 
@@ -191,3 +194,12 @@ async def get_document_endpoint(
     if document is None or document.knowledge_base_id != kb_id:
         raise HTTPException(404, "Document not found")
     return document
+
+
+@router.post("/{kb_id}/search", response_model=list[SearchHitResponse])
+async def search_endpoint(
+    kb_id: UUID, request: SearchRequest,
+    user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db),
+):
+    hits = await search_chunks(db, kb_id, user.id, request.query, top_k=request.top_k)
+    return [SearchHitResponse(**hit.__dict__) for hit in hits]
