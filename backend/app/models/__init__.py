@@ -51,6 +51,7 @@ class User(Base):
         "Conversation", back_populates="user", cascade="all, delete-orphan"
     )
     audit_logs = relationship("AuditLog", back_populates="user")
+    agent_runs = relationship("AgentRun", back_populates="user", cascade="all, delete-orphan")
 
 
 class AuditLog(Base):
@@ -90,6 +91,9 @@ class Conversation(Base):
         cascade="all, delete-orphan",
         order_by="Message.created_at",
     )
+    agent_runs = relationship(
+        "AgentRun", back_populates="conversation", cascade="all, delete-orphan"
+    )
 
 
 class Message(Base):
@@ -105,6 +109,75 @@ class Message(Base):
     created_at = Column(DateTime(timezone=True), default=utcnow)
 
     conversation = relationship("Conversation", back_populates="messages")
+
+
+class AgentRun(Base):
+    __tablename__ = "agent_runs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    conversation_id = Column(
+        UUID(as_uuid=True), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False
+    )
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    status = Column(String(32), nullable=False, default="running")
+    allowed_tools = Column(Text, nullable=False, default="[]")
+    model_context = Column(Text, nullable=False, default="[]")
+    step_count = Column(Integer, nullable=False, default=0)
+    elapsed_ms = Column(Integer, nullable=False, default=0)
+    created_at = Column(
+        DateTime(timezone=True), default=utcnow, server_default="now()", nullable=False
+    )
+    updated_at = Column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('running','waiting_confirmation','completed','limit_reached','failed')",
+            name="ck_agent_runs_status",
+        ),
+    )
+    conversation = relationship("Conversation", back_populates="agent_runs")
+    user = relationship("User", back_populates="agent_runs")
+    tool_calls = relationship(
+        "ToolCall",
+        back_populates="run",
+        cascade="all, delete-orphan",
+        order_by="ToolCall.step_number",
+    )
+
+
+class ToolCall(Base):
+    __tablename__ = "tool_calls"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=new_uuid)
+    run_id = Column(
+        UUID(as_uuid=True), ForeignKey("agent_runs.id", ondelete="CASCADE"), nullable=False
+    )
+    step_number = Column(Integer, nullable=False)
+    provider_call_id = Column(String(256), nullable=False)
+    tool_name = Column(String(128), nullable=False)
+    arguments = Column(Text, nullable=False)
+    side_effect = Column(String(8), nullable=False)
+    impact = Column(Text, nullable=False, default="")
+    status = Column(String(32), nullable=False)
+    result = Column(Text)
+    error = Column(Text)
+    expires_at = Column(DateTime(timezone=True))
+    created_at = Column(
+        DateTime(timezone=True), default=utcnow, server_default="now()", nullable=False
+    )
+    updated_at = Column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+    __table_args__ = (
+        CheckConstraint("side_effect IN ('read','write')", name="ck_tool_calls_side_effect"),
+        CheckConstraint(
+            "status IN ('pending_confirmation','running','succeeded','denied','expired','failed')",
+            name="ck_tool_calls_status",
+        ),
+        UniqueConstraint("run_id", "step_number", name="uq_tool_calls_run_step"),
+    )
+    run = relationship("AgentRun", back_populates="tool_calls")
 
 
 # ---------- Knowledge Base ----------
