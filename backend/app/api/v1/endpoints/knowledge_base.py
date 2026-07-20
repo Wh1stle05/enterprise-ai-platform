@@ -20,6 +20,9 @@ from app.schemas.knowledge import (
     KnowledgeBaseResponse,
     SearchHitResponse,
     SearchRequest,
+    AnswerResponse,
+    CitationResponse,
+    QuestionRequest,
 )
 from app.services.file_storage import (
     EmptyUploadError,
@@ -36,6 +39,7 @@ from app.services.knowledge_service import (
 )
 from app.tasks.document_tasks import process_document_task
 from app.services.retrieval_service import search_chunks
+from app.services.rag_service import answer_question
 
 router = APIRouter()
 
@@ -203,3 +207,16 @@ async def search_endpoint(
 ):
     hits = await search_chunks(db, kb_id, user.id, request.query, top_k=request.top_k)
     return [SearchHitResponse(**hit.__dict__) for hit in hits]
+
+
+@router.post("/{kb_id}/ask", response_model=AnswerResponse)
+async def ask_endpoint(
+    kb_id: UUID, request: QuestionRequest,
+    user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db),
+):
+    answer = await answer_question(db, kb_id, user, request.question, top_k=request.top_k)
+    return AnswerResponse(
+        answer=answer.answer,
+        no_evidence=answer.no_evidence,
+        citations=[CitationResponse(**citation.__dict__) for citation in answer.citations],
+    )
