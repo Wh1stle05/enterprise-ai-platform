@@ -5,6 +5,9 @@ from httpx import AsyncClient
 
 async def test_upload_returns_pending_provenance(client: AsyncClient, tmp_path, monkeypatch):
     monkeypatch.setattr("app.core.config.settings.UPLOAD_DIR", str(tmp_path))
+    monkeypatch.setattr(
+        "app.api.v1.endpoints.knowledge_base.process_document_task.delay", lambda _: None
+    )
     registered = await client.post(
         "/api/v1/auth/register",
         json={

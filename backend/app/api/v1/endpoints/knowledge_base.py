@@ -4,6 +4,7 @@ from pathlib import Path
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,6 +32,7 @@ from app.services.knowledge_service import (
     get_knowledge_base,
     list_knowledge_bases,
 )
+from app.tasks.document_tasks import process_document_task
 
 router = APIRouter()
 
@@ -154,5 +156,38 @@ async def upload_endpoint(
         if "uq_documents_kb_checksum" in str(exc.orig):
             raise HTTPException(409, "This file already exists in the knowledge base") from exc
         raise
+    await db.commit()
+    try:
+        process_document_task.delay(str(document.id))
+    except Exception as exc:
+        document.status = "failed"
+        document.error_message = "Task queue unavailable"
+        await db.commit()
+        raise HTTPException(503, "Task queue unavailable") from exc
     await db.refresh(document)
+    return document
+
+
+@router.get("/{kb_id}/documents", response_model=list[DocumentResponse])
+async def list_documents_endpoint(
+    kb_id: UUID, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+):
+    await require_kb_access(db, kb_id, user.id, "viewer")
+    result = await db.execute(
+        select(Document)
+        .where(Document.knowledge_base_id == kb_id)
+        .order_by(Document.created_at.desc())
+    )
+    return result.scalars().all()
+
+
+@router.get("/{kb_id}/documents/{document_id}", response_model=DocumentResponse)
+async def get_document_endpoint(
+    kb_id: UUID, document_id: UUID,
+    user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db),
+):
+    await require_kb_access(db, kb_id, user.id, "viewer")
+    document = await db.get(Document, document_id)
+    if document is None or document.knowledge_base_id != kb_id:
+        raise HTTPException(404, "Document not found")
     return document
