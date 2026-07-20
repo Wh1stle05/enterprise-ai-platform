@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     LLM_BASE_URL: Optional[str] = None
     LLM_MODEL: str = "gpt-4o-mini"
     LLM_MAX_TOKENS: int = 4096
+    AUDIT_RETENTION_DAYS: int = 90
 
     # Embedding
     EMBEDDING_MODEL: str = "text-embedding-3-small"

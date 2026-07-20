@@ -8,9 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.core.database import Base, get_db
 from app.main import app
-from app.models import (
-    User,  # noqa: F401
-)
+from app.models import AuditLog, User  # noqa: F401
 
 TEST_DATABASE_URL = "sqlite+aiosqlite://"
 
@@ -56,7 +54,9 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
 @pytest_asyncio.fixture
 async def client() -> AsyncGenerator[AsyncClient, None]:
     app.dependency_overrides[get_db] = override_get_db
+    app.state.audit_session_factory = async_session_factory
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
     app.dependency_overrides.clear()
+    app.state.audit_session_factory = None
