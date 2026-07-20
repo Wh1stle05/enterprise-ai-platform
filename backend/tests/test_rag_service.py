@@ -4,7 +4,6 @@ from uuid import uuid4
 
 import pytest
 
-from app.core.config import settings
 from app.services.rag_service import NO_EVIDENCE_MESSAGE, answer_question
 from app.services.retrieval_service import SearchHit
 

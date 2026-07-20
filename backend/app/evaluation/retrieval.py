@@ -50,7 +50,13 @@ def summarize(cases: list[EvaluationResult], k: int) -> EvaluationSummary:
     )
 
 
-async def evaluate(cases, *, searcher: Callable[..., Awaitable], answerer: Callable[..., Awaitable], top_k: int) -> list[EvaluationResult]:
+async def evaluate(
+    cases,
+    *,
+    searcher: Callable[..., Awaitable],
+    answerer: Callable[..., Awaitable],
+    top_k: int,
+) -> list[EvaluationResult]:
     results = []
     for case in cases:
         retrieved = await searcher(case, top_k=case.top_k or top_k)

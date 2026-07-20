@@ -1,9 +1,8 @@
 import argparse
-import asyncio
 import json
 from dataclasses import asdict
 
-from app.evaluation.retrieval import load_cases, summarize
+from app.evaluation.retrieval import summarize
 
 
 def main() -> int:
@@ -20,7 +19,10 @@ def main() -> int:
     if args.output:
         with open(args.output, "w", encoding="utf-8") as output:
             json.dump(payload, output, indent=2)
-    return int(summary.recall_at_k < args.min_recall or summary.citation_coverage < args.min_citation_coverage)
+    return int(
+        summary.recall_at_k < args.min_recall
+        or summary.citation_coverage < args.min_citation_coverage
+    )
 
 
 if __name__ == "__main__":

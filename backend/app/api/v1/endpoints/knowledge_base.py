@@ -15,14 +15,14 @@ from app.models import Document, User
 from app.schemas.knowledge import (
     ACLResponse,
     ACLUpsert,
+    AnswerResponse,
+    CitationResponse,
     DocumentResponse,
     KnowledgeBaseCreate,
     KnowledgeBaseResponse,
+    QuestionRequest,
     SearchHitResponse,
     SearchRequest,
-    AnswerResponse,
-    CitationResponse,
-    QuestionRequest,
 )
 from app.services.file_storage import (
     EmptyUploadError,
@@ -37,9 +37,9 @@ from app.services.knowledge_service import (
     get_knowledge_base,
     list_knowledge_bases,
 )
-from app.tasks.document_tasks import process_document_task
-from app.services.retrieval_service import search_chunks
 from app.services.rag_service import answer_question
+from app.services.retrieval_service import search_chunks
+from app.tasks.document_tasks import process_document_task
 
 router = APIRouter()
 

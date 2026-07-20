@@ -236,66 +236,116 @@ Interactive documentation is available at `GET /docs`; the machine-readable cont
 
 ---
 
-## Knowledge Bases (V2 Preview)
+## Knowledge Bases (M2)
 
-All KB endpoints require `Authorization: Bearer <token>` header.
+All knowledge-base endpoints require `Authorization: Bearer <token>`. Resource
+authorization is ACL-based: `viewer` can read/search/ask, `editor` can upload,
+and only `owner` can change ACLs or delete a knowledge base. Inaccessible IDs
+return `404`.
 
-### `GET /knowledge-bases`
+### Knowledge-base CRUD
 
-List knowledge bases for the current user.
+```bash
+curl -X POST http://localhost:8000/api/v1/knowledge-bases \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"name":"HR Policies","description":"Company policy documents"}'
+
+curl http://localhost:8000/api/v1/knowledge-bases \
+  -H "Authorization: Bearer $TOKEN"
+
+curl http://localhost:8000/api/v1/knowledge-bases/$KB_ID \
+  -H "Authorization: Bearer $TOKEN"
+
+curl -X DELETE http://localhost:8000/api/v1/knowledge-bases/$KB_ID \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+`POST` returns `201` and creates an owner ACL entry. `GET` returns
+`id`, `name`, `description`, `access_level`, `document_count`, `created_at`,
+and `updated_at`. `DELETE` returns `204` and removes source files and metadata.
+
+### ACL
+
+```bash
+curl http://localhost:8000/api/v1/knowledge-bases/$KB_ID/acl \
+  -H "Authorization: Bearer $TOKEN"
+
+curl -X PUT http://localhost:8000/api/v1/knowledge-bases/$KB_ID/acl/$USER_ID \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"access_level":"viewer"}'
+
+curl -X DELETE http://localhost:8000/api/v1/knowledge-bases/$KB_ID/acl/$USER_ID \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+ACL levels are `owner`, `editor`, and `viewer`. Listing and mutation return
+entries containing `subject_id`, `username`, `access_level`, and `created_at`.
+Only an owner can mutate ACLs; an owner cannot remove or downgrade their own
+owner entry. ACL mutation returns `200`; deletion returns `204`.
+
+### Upload and document status
+
+Supported formats are `.pdf`, `.docx`, `.xlsx`, and `.md`.
+
+```bash
+curl -X POST http://localhost:8000/api/v1/knowledge-bases/$KB_ID/documents \
+  -H "Authorization: Bearer $TOKEN" \
+  -F 'file=@backend/tests/fixtures/sample.md;type=text/markdown'
+
+curl http://localhost:8000/api/v1/knowledge-bases/$KB_ID/documents/$DOCUMENT_ID \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Upload returns `202` with `status: "pending"`, checksum, storage URI,
+parser/embedding provenance, and timestamps. The worker transitions the
+document through `pending -> processing -> ready` or `failed`.
+
+```json
+{
+  "id":"uuid", "knowledge_base_id":"uuid", "filename":"sample.md",
+  "file_type":"text/markdown", "file_size":123, "storage_uri":"local://...",
+  "checksum":"sha256", "parser_version":"m2-1",
+  "embedding_model":"text-embedding-3-small", "embedding_dim":1536,
+  "status":"ready", "chunk_count":2, "error_message":null,
+  "created_at":"datetime", "processed_at":"datetime"
+}
+```
+
+### Search
+
+```bash
+curl -X POST http://localhost:8000/api/v1/knowledge-bases/$KB_ID/search \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"query":"How much annual leave?","top_k":5}'
+```
+
+Search returns ready-document hits with `chunk_id`, `document_id`, `filename`,
+`chunk_index`, `content`, `source_locator`, and cosine `score`.
+
+### Ask with citations
+
+```bash
+curl -X POST http://localhost:8000/api/v1/knowledge-bases/$KB_ID/ask \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"question":"How much annual leave?","top_k":5}'
+```
 
 **Response** `200 OK`
 ```json
-[
-  {
-    "id": "uuid",
-    "name": "string",
-    "description": "string",
-    "document_count": 0,
-    "created_at": "datetime (ISO 8601)"
-  }
-]
-```
-
-### `POST /knowledge-bases`
-
-Create a new knowledge base.
-
-**Request Body**
-```json
 {
-  "name": "string (required)",
-  "description": "string (default: '')"
+  "answer":"Employees receive five days of annual leave [S1].",
+  "no_evidence":false,
+  "citations":[{
+    "label":"[S1]", "chunk_id":"uuid", "document_id":"uuid",
+    "filename":"sample.md", "source_locator":"document",
+    "chunk_index":0, "score":0.95
+  }]
 }
 ```
 
-**Response** `201 Created`
-```json
-{
-  "id": "uuid",
-  "name": "string",
-  "description": "string"
-}
-```
-
-### `POST /knowledge-bases/{kb_id}/documents`
-
-Upload a document to a knowledge base.
-
-**Request** — `multipart/form-data`
-- `file`: The file to upload (any type)
-
-**Response** `201 Created`
-```json
-{
-  "id": "uuid",
-  "filename": "string",
-  "status": "pending",
-  "file_size": 12345
-}
-```
-
-**Error** `404 Not Found` — Knowledge base not found.
+When no retrieved evidence meets `RETRIEVAL_MIN_SCORE`, the response is
+`no_evidence: true`, `citations: []`, and the exact answer:
+`No sufficient evidence found. Please add relevant documents or contact an administrator.`
 
 ---
 
@@ -312,6 +362,11 @@ All errors return a JSON body:
 | Status | Meaning |
 |--------|---------|
 | 401 | Unauthorized — invalid or missing token |
-| 404 | Resource not found |
-| 409 | Conflict — duplicate resource |
-| 422 | Validation error — invalid request body |
+| 403 | Forbidden — global role or ACL level is insufficient |
+| 404 | Resource not found, including an inaccessible knowledge base/document |
+| 409 | Conflict — duplicate document checksum or invalid owner ACL change |
+| 413 | Upload exceeds `MAX_UPLOAD_SIZE_MB` |
+| 415 | Upload extension is not `.pdf`, `.docx`, `.xlsx`, or `.md` |
+| 422 | Validation error — malformed UUID, request body, or empty upload |
+| 502 | LLM/provider failure or invalid citation contract |
+| 503 | LLM/embedding configuration or task queue is unavailable |
