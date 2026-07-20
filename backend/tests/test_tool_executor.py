@@ -103,7 +103,7 @@ async def test_immediate_read_executes_with_exact_arguments_and_audit(db_session
     assert calls == [arguments]
     assert json.loads(call.arguments) == arguments
     events = await audit_events(db_session)
-    assert [event.action_type for event in events] == ["tool_proposed", "tool_executed"]
+    assert [event.action_type for event in events] == ["tool_call_requested", "tool_call_succeeded"]
     assert "secret-value" not in (events[0].input or "")
     assert '"token": "[REDACTED]"' in (events[0].input or "")
 
@@ -219,6 +219,6 @@ async def test_deny_expiry_and_handler_failure_are_terminal_and_audited(db_sessi
     assert failing.status == "failed"
     assert failing.error == "handler exploded"
     assert [event.action_type for event in await audit_events(db_session)] == [
-        "tool_proposed", "tool_denied", "tool_proposed", "tool_expired",
-        "tool_proposed", "tool_confirmed", "tool_failed",
+        "tool_call_requested", "tool_call_denied", "tool_call_requested", "tool_call_expired",
+        "tool_call_requested", "tool_call_confirmed", "tool_call_failed",
     ]

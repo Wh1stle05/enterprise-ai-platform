@@ -12,9 +12,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.agent.contracts import PlannedToolCall, ToolContext
 from app.agent.registry import ToolArgumentsError, ToolRegistry, UnknownToolError
 from app.core.audit import record_audit
+from app.core.config import settings
 from app.models import AgentRun, ToolCall, User
 
-DEFAULT_CONFIRMATION_TTL = timedelta(minutes=10)
+DEFAULT_CONFIRMATION_TTL = timedelta(seconds=settings.TOOL_CONFIRMATION_TTL_SECONDS)
 
 
 def _utc(value: datetime | None) -> datetime:
@@ -109,7 +110,7 @@ async def propose_or_execute(
     db.add(call)
     await db.flush()
     await record_audit(
-        db, action_type="tool_proposed", user_id=user.id, input_data=_audit_input(call, arguments),
+        db, action_type="tool_call_requested", user_id=user.id, input_data=_audit_input(call, arguments),
         tool_used=tool.name,
     )
     if tool.side_effect == "write":
@@ -151,7 +152,7 @@ async def _execute_claimed(
         call.status = "failed"
         call.error = str(exc)
         await record_audit(
-            db, action_type="tool_failed", user_id=user_id, input_data=audit_input,
+            db, action_type="tool_call_failed", user_id=user_id, input_data=audit_input,
             output={"error": str(exc)}, tool_used=call.tool_name,
         )
         await db.commit()
@@ -160,7 +161,7 @@ async def _execute_claimed(
     call.status = "succeeded"
     call.result = json.dumps(output, sort_keys=True, default=str)
     await record_audit(
-        db, action_type="tool_executed", user_id=user.id, input_data=_audit_input(call, arguments),
+        db, action_type="tool_call_succeeded", user_id=user.id, input_data=_audit_input(call, arguments),
         output=output, tool_used=call.tool_name,
     )
     await db.commit()
@@ -200,7 +201,7 @@ async def decide_tool_call(
             call.status = "expired"
             run.status = "running"
             await record_audit(
-                db, action_type="tool_expired", user_id=user.id, input_data=_audit_input(call),
+                db, action_type="tool_call_expired", user_id=user.id, input_data=_audit_input(call),
                 tool_used=call.tool_name,
             )
             await db.commit()
@@ -218,7 +219,7 @@ async def decide_tool_call(
         raise HTTPException(status.HTTP_409_CONFLICT, "Tool call is no longer pending")
     call.status = target
     run.status = "running"
-    event = "tool_confirmed" if confirm else "tool_denied"
+    event = "tool_call_confirmed" if confirm else "tool_call_denied"
     await record_audit(
         db,
         action_type=event,

@@ -30,6 +30,15 @@ class Settings(BaseSettings):
     LLM_MAX_TOKENS: int = 4096
     AUDIT_RETENTION_DAYS: int = 90
 
+    # Agent
+    AGENT_MAX_STEPS: int = 6
+    AGENT_MAX_ACTIVE_SECONDS: float = 20.0
+    TOOL_CONFIRMATION_TTL_SECONDS: int = 300
+    AGENT_TOOL_WHITELIST: list[str] = [
+        "knowledge_search", "create_work_ticket", "query_inventory",
+        "get_leave_balance", "submit_expense",
+    ]
+
     # Embedding
     EMBEDDING_MODEL: str = "text-embedding-3-small"
     EMBEDDING_DIM: int = 1536
