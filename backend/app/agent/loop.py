@@ -39,11 +39,16 @@ def _utc(value: datetime | None) -> datetime:
 def _call_message(call: PlannedToolCall) -> dict[str, Any]:
     return {
         "role": "assistant",
-        "tool_calls": [{
-            "id": call.call_id,
-            "type": "function",
-            "function": {"name": call.name, "arguments": json.dumps(call.arguments, sort_keys=True)},
-        }],
+        "tool_calls": [
+            {
+                "id": call.call_id,
+                "type": "function",
+                "function": {
+                    "name": call.name,
+                    "arguments": json.dumps(call.arguments, sort_keys=True),
+                },
+            }
+        ],
     }
 
 
@@ -63,7 +68,9 @@ def _call_observation(call: ToolCall) -> dict[str, str]:
     return _observation(call.provider_call_id, content)
 
 
-def build_turn_result(run: AgentRun, *, answer: str | None = None, tool_call: ToolCall | None = None) -> AgentTurnResult:
+def build_turn_result(
+    run: AgentRun, *, answer: str | None = None, tool_call: ToolCall | None = None
+) -> AgentTurnResult:
     return AgentTurnResult(
         run_id=run.id,
         status=run.status,
@@ -110,7 +117,9 @@ async def _drive(
         run.step_count += 1
         try:
             planned_result = plan_next_step(context, registry, set(json.loads(run.allowed_tools)))
-            decision: AgentDecision = await planned_result if inspect.isawaitable(planned_result) else planned_result
+            decision: AgentDecision = (
+                await planned_result if inspect.isawaitable(planned_result) else planned_result
+            )
         except Exception as exc:
             run.status = "failed"
             await db.flush()
@@ -118,7 +127,9 @@ async def _drive(
 
         if decision.final_answer is not None:
             run.status = "completed"
-            run.model_context = json.dumps(context + [{"role": "assistant", "content": decision.final_answer}])
+            run.model_context = json.dumps(
+                context + [{"role": "assistant", "content": decision.final_answer}]
+            )
             run.elapsed_ms = max(run.elapsed_ms, int((time.monotonic() - started) * 1000))
             await db.flush()
             return build_turn_result(run, answer=decision.final_answer)
@@ -128,8 +139,13 @@ async def _drive(
         context.append(_call_message(planned))
         try:
             call = await propose_or_execute(
-                db, registry, run_id=run.id, user_id=user_id,
-                planned_call=planned, step_number=run.step_count, now=now,
+                db,
+                registry,
+                run_id=run.id,
+                user_id=user_id,
+                planned_call=planned,
+                step_number=run.step_count,
+                now=now,
             )
         except HTTPException as exc:
             feedback = exc.detail or "Tool call failed"
@@ -172,19 +188,29 @@ async def start_agent_turn(
     now: datetime | None = None,
 ) -> AgentTurnResult:
     cid, uid = UUID(str(conversation_id)), UUID(str(user_id))
-    conversation = (await db.execute(select(Conversation).where(Conversation.id == cid, Conversation.user_id == uid))).scalar_one_or_none()
+    conversation = (
+        await db.execute(
+            select(Conversation).where(Conversation.id == cid, Conversation.user_id == uid)
+        )
+    ).scalar_one_or_none()
     if conversation is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Conversation not found")
     requested = allowed_tools if allowed_tools is not None else set(settings.AGENT_TOOL_WHITELIST)
     effective = set(requested) & set(settings.AGENT_TOOL_WHITELIST) & registry.names
     run = AgentRun(
-        conversation_id=cid, user_id=uid, status="running",
+        conversation_id=cid,
+        user_id=uid,
+        status="running",
         allowed_tools=json.dumps(sorted(effective)),
-        model_context=json.dumps(history if history is not None else [{"role": "user", "content": content}]),
+        model_context=json.dumps(
+            history if history is not None else [{"role": "user", "content": content}]
+        ),
     )
     db.add(run)
     await db.flush()
-    return await _drive(db, registry, run, uid, max_steps=max_steps, max_active_seconds=max_active_seconds, now=now)
+    return await _drive(
+        db, registry, run, uid, max_steps=max_steps, max_active_seconds=max_active_seconds, now=now
+    )
 
 
 async def resume_agent_run(
@@ -203,15 +229,21 @@ async def resume_agent_run(
     if run.status != "waiting_confirmation":
         return build_turn_result(run)
     pending = (
-        await db.execute(
-            select(ToolCall)
-            .where(ToolCall.run_id == run.id, ToolCall.status == "pending_confirmation")
-            .order_by(ToolCall.step_number)
+        (
+            await db.execute(
+                select(ToolCall)
+                .where(ToolCall.run_id == run.id, ToolCall.status == "pending_confirmation")
+                .order_by(ToolCall.step_number)
+            )
         )
-    ).scalars().first()
+        .scalars()
+        .first()
+    )
     if pending is None or confirm is None:
         return build_turn_result(run, tool_call=pending)
-    call = await decide_tool_call(db, registry, tool_call_id=pending.id, user_id=uid, confirm=confirm, now=now)
+    call = await decide_tool_call(
+        db, registry, tool_call_id=pending.id, user_id=uid, confirm=confirm, now=now
+    )
     context = json.loads(run.model_context)
     if call.status in {"denied", "expired"}:
         context.append(_call_observation(call))
@@ -224,4 +256,6 @@ async def resume_agent_run(
     run.model_context = json.dumps(context)
     run.status = "running"
     await db.flush()
-    return await _drive(db, registry, run, uid, max_steps=max_steps, max_active_seconds=max_active_seconds, now=now)
+    return await _drive(
+        db, registry, run, uid, max_steps=max_steps, max_active_seconds=max_active_seconds, now=now
+    )

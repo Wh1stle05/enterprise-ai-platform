@@ -99,20 +99,26 @@ async def send_message(
     db.add(user_message)
     await db.flush()
     history_rows = (
-        await db.execute(
-            select(Message)
-            .where(Message.conversation_id == cid)
-            .order_by(Message.created_at.desc(), Message.id.desc())
-            .limit(20)
+        (
+            await db.execute(
+                select(Message)
+                .where(Message.conversation_id == cid)
+                .order_by(Message.created_at.desc(), Message.id.desc())
+                .limit(20)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     result = await start_agent_turn(
         db,
         build_default_registry(),
         cid,
         uid,
         content,
-        history=[{"role": message.role, "content": message.content} for message in reversed(history_rows)],
+        history=[
+            {"role": message.role, "content": message.content} for message in reversed(history_rows)
+        ],
     )
     if result.answer:
         db.add(Message(conversation_id=cid, role="assistant", content=result.answer))
