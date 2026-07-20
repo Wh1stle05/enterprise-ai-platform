@@ -1,15 +1,30 @@
 """Knowledge base CRUD and resource ACL endpoints."""
 
-from uuid import UUID
+from pathlib import Path
+from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import get_current_user, require_roles
-from app.models import User
-from app.schemas.knowledge import ACLResponse, ACLUpsert, KnowledgeBaseCreate, KnowledgeBaseResponse
-from app.services.knowledge_acl_service import delete_acl, list_acl, upsert_acl
+from app.models import Document, User
+from app.schemas.knowledge import (
+    ACLResponse,
+    ACLUpsert,
+    DocumentResponse,
+    KnowledgeBaseCreate,
+    KnowledgeBaseResponse,
+)
+from app.services.file_storage import (
+    EmptyUploadError,
+    LocalFileStorage,
+    UnsupportedFileTypeError,
+    UploadTooLargeError,
+)
+from app.services.knowledge_acl_service import delete_acl, list_acl, require_kb_access, upsert_acl
 from app.services.knowledge_service import (
     create_knowledge_base,
     delete_knowledge_base,
@@ -99,3 +114,45 @@ async def acl_delete_endpoint(
 ):
     await delete_acl(db, kb_id, user.id, subject_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/{kb_id}/documents", response_model=DocumentResponse, status_code=status.HTTP_202_ACCEPTED
+)
+async def upload_endpoint(
+    kb_id: UUID,
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await require_kb_access(db, kb_id, user.id, "editor")
+    document_id = uuid4()
+    document = Document(
+        id=document_id,
+        knowledge_base_id=kb_id, filename=file.filename or "unknown",
+        file_type=file.content_type, storage_uri="", checksum="",
+        parser_version=settings.PARSER_VERSION, embedding_model=settings.EMBEDDING_MODEL,
+        embedding_dim=settings.EMBEDDING_DIM, status="pending",
+    )
+    storage = LocalFileStorage(Path(settings.UPLOAD_DIR), settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024)
+    try:
+        stored = await storage.save(kb_id, document.id, document.filename, file)
+    except UnsupportedFileTypeError as exc:
+        raise HTTPException(415, f"Unsupported file type: {exc}") from exc
+    except EmptyUploadError as exc:
+        raise HTTPException(422, "Upload cannot be empty") from exc
+    except UploadTooLargeError as exc:
+        raise HTTPException(413, "Upload exceeds the configured size limit") from exc
+    document.storage_uri = stored.uri
+    document.file_size = stored.size
+    document.checksum = stored.checksum
+    db.add(document)
+    try:
+        await db.flush()
+    except IntegrityError as exc:
+        await storage.delete(stored.uri)
+        if "uq_documents_kb_checksum" in str(exc.orig):
+            raise HTTPException(409, "This file already exists in the knowledge base") from exc
+        raise
+    await db.refresh(document)
+    return document

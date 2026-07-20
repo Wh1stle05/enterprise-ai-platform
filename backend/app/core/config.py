@@ -37,6 +37,14 @@ class Settings(BaseSettings):
     # File storage
     UPLOAD_DIR: str = "uploads"
     MAX_UPLOAD_SIZE_MB: int = 50
+    UPLOAD_CHUNK_SIZE_BYTES: int = 1048576
+    PARSER_VERSION: str = "m2-1"
+    CHUNK_SIZE: int = 1000
+    CHUNK_OVERLAP: int = 200
+    RETRIEVAL_DEFAULT_TOP_K: int = 5
+    RETRIEVAL_MAX_TOP_K: int = 20
+    RETRIEVAL_MIN_SCORE: float = 0.35
+    EMBEDDING_BATCH_SIZE: int = 64
 
     # CORS
     CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:5173"]
