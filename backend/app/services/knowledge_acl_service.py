@@ -10,10 +10,14 @@ ACCESS_RANK = {"viewer": 10, "editor": 20, "owner": 30}
 
 
 async def get_kb_access(db: AsyncSession, kb_id: UUID, user_id: UUID) -> str | None:
-    return (await db.execute(select(KnowledgeBaseACL.access_level).where(
-        KnowledgeBaseACL.knowledge_base_id == kb_id,
-        KnowledgeBaseACL.subject_id == user_id,
-    ))).scalar_one_or_none()
+    return (
+        await db.execute(
+            select(KnowledgeBaseACL.access_level).where(
+                KnowledgeBaseACL.knowledge_base_id == kb_id,
+                KnowledgeBaseACL.subject_id == user_id,
+            )
+        )
+    ).scalar_one_or_none()
 
 
 async def require_kb_access(db: AsyncSession, kb_id: UUID, user_id: UUID, minimum: str) -> str:
@@ -27,12 +31,14 @@ async def require_kb_access(db: AsyncSession, kb_id: UUID, user_id: UUID, minimu
 
 async def list_acl(db: AsyncSession, kb_id: UUID, actor_id: UUID):
     await require_kb_access(db, kb_id, actor_id, "owner")
-    return (await db.execute(
-        select(KnowledgeBaseACL, User.username)
-        .join(User, User.id == KnowledgeBaseACL.subject_id)
-        .where(KnowledgeBaseACL.knowledge_base_id == kb_id)
-        .order_by(KnowledgeBaseACL.created_at)
-    )).all()
+    return (
+        await db.execute(
+            select(KnowledgeBaseACL, User.username)
+            .join(User, User.id == KnowledgeBaseACL.subject_id)
+            .where(KnowledgeBaseACL.knowledge_base_id == kb_id)
+            .order_by(KnowledgeBaseACL.created_at)
+        )
+    ).all()
 
 
 async def upsert_acl(

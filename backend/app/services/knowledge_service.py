@@ -19,14 +19,16 @@ async def create_knowledge_base(user: User, request: KnowledgeBaseCreate, db: As
 
 async def list_knowledge_bases(user: User, db: AsyncSession):
     count = func.count(Document.id).label("document_count")
-    return (await db.execute(
-        select(KnowledgeBase, KnowledgeBaseACL.access_level, count)
-        .join(KnowledgeBaseACL, KnowledgeBaseACL.knowledge_base_id == KnowledgeBase.id)
-        .outerjoin(Document, Document.knowledge_base_id == KnowledgeBase.id)
-        .where(KnowledgeBaseACL.subject_id == user.id)
-        .group_by(KnowledgeBase.id, KnowledgeBaseACL.access_level)
-        .order_by(KnowledgeBase.updated_at.desc())
-    )).all()
+    return (
+        await db.execute(
+            select(KnowledgeBase, KnowledgeBaseACL.access_level, count)
+            .join(KnowledgeBaseACL, KnowledgeBaseACL.knowledge_base_id == KnowledgeBase.id)
+            .outerjoin(Document, Document.knowledge_base_id == KnowledgeBase.id)
+            .where(KnowledgeBaseACL.subject_id == user.id)
+            .group_by(KnowledgeBase.id, KnowledgeBaseACL.access_level)
+            .order_by(KnowledgeBase.updated_at.desc())
+        )
+    ).all()
 
 
 async def get_knowledge_base(kb_id: UUID, user: User, db: AsyncSession):

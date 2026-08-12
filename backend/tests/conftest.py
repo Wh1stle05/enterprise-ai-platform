@@ -43,6 +43,8 @@ async def setup_database():
     yield
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
+    # Close the aiosqlite worker thread so pytest exits cleanly after the run.
+    await engine.dispose()
 
 
 @pytest_asyncio.fixture

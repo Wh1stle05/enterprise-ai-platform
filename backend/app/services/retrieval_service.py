@@ -22,7 +22,12 @@ class SearchHit:
 
 
 async def search_chunks(
-    db: AsyncSession, kb_id: UUID, user_id: UUID, query: str, *, top_k: int,
+    db: AsyncSession,
+    kb_id: UUID,
+    user_id: UUID,
+    query: str,
+    *,
+    top_k: int,
     embedder=embed_texts,
 ) -> list[SearchHit]:
     await require_kb_access(db, kb_id, user_id, "viewer")
@@ -30,12 +35,24 @@ async def search_chunks(
         raise ValueError("top_k must be between 1 and RETRIEVAL_MAX_TOP_K")
     query_vector = (await embedder([query]))[0]
     distance = DocumentChunk.embedding.cosine_distance(query_vector)
-    rows = (await db.execute(
-        select(DocumentChunk, Document.filename, distance.label("distance"))
-        .join(Document)
-        .where(Document.knowledge_base_id == kb_id, Document.status == "ready")
-        .order_by(distance.asc()).limit(top_k)
-    )).all()
-    return [SearchHit(c.id, c.document_id, filename, c.chunk_index, c.content, c.source_locator,
-                      max(-1.0, min(1.0, 1.0 - float(distance_value))))
-            for c, filename, distance_value in rows]
+    rows = (
+        await db.execute(
+            select(DocumentChunk, Document.filename, distance.label("distance"))
+            .join(Document)
+            .where(Document.knowledge_base_id == kb_id, Document.status == "ready")
+            .order_by(distance.asc())
+            .limit(top_k)
+        )
+    ).all()
+    return [
+        SearchHit(
+            c.id,
+            c.document_id,
+            filename,
+            c.chunk_index,
+            c.content,
+            c.source_locator,
+            max(-1.0, min(1.0, 1.0 - float(distance_value))),
+        )
+        for c, filename, distance_value in rows
+    ]

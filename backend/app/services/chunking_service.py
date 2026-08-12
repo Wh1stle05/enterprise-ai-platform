@@ -19,8 +19,10 @@ def chunk_sections(
     if chunk_size <= 0 or not 0 <= chunk_overlap < chunk_size:
         raise ValueError("chunk_overlap must satisfy 0 <= chunk_overlap < chunk_size")
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=chunk_size, chunk_overlap=chunk_overlap,
-        separators=[""], length_function=len,
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        separators=[""],
+        length_function=len,
     )
     result: list[TextChunk] = []
     for section in sections:

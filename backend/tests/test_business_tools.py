@@ -19,8 +19,10 @@ def test_business_registry_exposes_exact_tools_and_contracts() -> None:
     }
 
     assert {
-        name: (registry.get(name, registry.names).side_effect,
-               registry.get(name, registry.names).parameters)
+        name: (
+            registry.get(name, registry.names).side_effect,
+            registry.get(name, registry.names).parameters,
+        )
         for name in registry.names
     } == {
         "create_work_ticket": (
@@ -141,12 +143,18 @@ def test_impact_text_is_deterministic_and_writes_are_explicit() -> None:
     assert registry.get("get_leave_balance", registry.names).impact({"leave_type": "annual"}) == (
         "Read annual leave balance."
     )
-    assert registry.get("create_work_ticket", registry.names).impact(
-        {"priority": "high", "title": "Blue screen"}
-    ) == "Create a high priority IT ticket titled 'Blue screen'."
-    assert registry.get("submit_expense", registry.names).impact(
-        {"amount": 12.5, "currency": "USD", "category": "meals"}
-    ) == "Submit 12.5 USD as meals expense."
+    assert (
+        registry.get("create_work_ticket", registry.names).impact(
+            {"priority": "high", "title": "Blue screen"}
+        )
+        == "Create a high priority IT ticket titled 'Blue screen'."
+    )
+    assert (
+        registry.get("submit_expense", registry.names).impact(
+            {"amount": 12.5, "currency": "USD", "category": "meals"}
+        )
+        == "Submit 12.5 USD as meals expense."
+    )
 
 
 def test_business_registry_rejects_invalid_arguments() -> None:

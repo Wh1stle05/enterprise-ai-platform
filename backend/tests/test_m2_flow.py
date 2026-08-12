@@ -127,10 +127,14 @@ async def test_m2_flow_is_acl_isolated_and_cited(
     assert [citation.label for citation in answer.citations] == ["[S1]"]
 
     audit_rows = (
-        await db_session.execute(
-            select(AuditLog).where(AuditLog.action_type == "knowledge_query")
+        (
+            await db_session.execute(
+                select(AuditLog).where(AuditLog.action_type == "knowledge_query")
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     assert audit_rows
     audit_output = json.loads(audit_rows[-1].output)
     assert audit_output["cited_chunk_ids"] == [str(chunk.id)]
@@ -142,7 +146,5 @@ async def test_m2_flow_is_acl_isolated_and_cited(
         headers=viewer_headers,
     )
     assert viewer_upload.status_code == 403
-    viewer_delete = await client.delete(
-        f"/api/v1/knowledge-bases/{kb_id}", headers=viewer_headers
-    )
+    viewer_delete = await client.delete(f"/api/v1/knowledge-bases/{kb_id}", headers=viewer_headers)
     assert viewer_delete.status_code == 403

@@ -110,7 +110,10 @@ async def propose_or_execute(
     db.add(call)
     await db.flush()
     await record_audit(
-        db, action_type="tool_call_requested", user_id=user.id, input_data=_audit_input(call, arguments),
+        db,
+        action_type="tool_call_requested",
+        user_id=user.id,
+        input_data=_audit_input(call, arguments),
         tool_used=tool.name,
     )
     if tool.side_effect == "write":
@@ -152,8 +155,12 @@ async def _execute_claimed(
         call.status = "failed"
         call.error = str(exc)
         await record_audit(
-            db, action_type="tool_call_failed", user_id=user_id, input_data=audit_input,
-            output={"error": str(exc)}, tool_used=call.tool_name,
+            db,
+            action_type="tool_call_failed",
+            user_id=user_id,
+            input_data=audit_input,
+            output={"error": str(exc)},
+            tool_used=call.tool_name,
         )
         await db.commit()
         return call
@@ -161,8 +168,12 @@ async def _execute_claimed(
     call.status = "succeeded"
     call.result = json.dumps(output, sort_keys=True, default=str)
     await record_audit(
-        db, action_type="tool_call_succeeded", user_id=user.id, input_data=_audit_input(call, arguments),
-        output=output, tool_used=call.tool_name,
+        db,
+        action_type="tool_call_succeeded",
+        user_id=user.id,
+        input_data=_audit_input(call, arguments),
+        output=output,
+        tool_used=call.tool_name,
     )
     await db.commit()
     return call
@@ -201,7 +212,10 @@ async def decide_tool_call(
             call.status = "expired"
             run.status = "running"
             await record_audit(
-                db, action_type="tool_call_expired", user_id=user.id, input_data=_audit_input(call),
+                db,
+                action_type="tool_call_expired",
+                user_id=user.id,
+                input_data=_audit_input(call),
                 tool_used=call.tool_name,
             )
             await db.commit()

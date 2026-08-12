@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     # LLM
     LLM_API_KEY: Optional[str] = None
     LLM_BASE_URL: Optional[str] = None
+    # Direct-connect model name, passed verbatim to the OpenAI-compatible SDK.
+    # Keep the upstream name: AI-Gateway routing (T2-00) will later switch this
+    # to the logical name "chat/gpt-4o-mini". An LLM_UPSTREAM_MODEL split is
+    # intentionally NOT implemented yet to avoid an unused configuration field.
     LLM_MODEL: str = "gpt-4o-mini"
     LLM_MAX_TOKENS: int = 4096
     AUDIT_RETENTION_DAYS: int = 90
@@ -35,11 +39,16 @@ class Settings(BaseSettings):
     AGENT_MAX_ACTIVE_SECONDS: float = 20.0
     TOOL_CONFIRMATION_TTL_SECONDS: int = 300
     AGENT_TOOL_WHITELIST: list[str] = [
-        "knowledge_search", "create_work_ticket", "query_inventory",
-        "get_leave_balance", "submit_expense",
+        "knowledge_search",
+        "create_work_ticket",
+        "query_inventory",
+        "get_leave_balance",
+        "submit_expense",
     ]
 
     # Embedding
+    # Direct-connect value; switch to "embed/text-embedding-3-small" only after
+    # AI-Gateway embedding routing lands (T2-03).
     EMBEDDING_MODEL: str = "text-embedding-3-small"
     EMBEDDING_DIM: int = 1536
 

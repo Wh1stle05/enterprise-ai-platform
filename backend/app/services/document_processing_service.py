@@ -37,8 +37,12 @@ async def mark_document_failed(
 
 
 async def process_document(
-    document_id: UUID, *, db_factory=async_session_factory, parser=parse_document,
-    chunker=chunk_sections, embedder=embed_texts,
+    document_id: UUID,
+    *,
+    db_factory=async_session_factory,
+    parser=parse_document,
+    chunker=chunk_sections,
+    embedder=embed_texts,
 ):
     async with db_factory() as db:
         document = await db.get(Document, document_id)
@@ -67,16 +71,18 @@ async def process_document(
             if document is None:
                 return
             await db.execute(delete(DocumentChunk).where(DocumentChunk.document_id == document_id))
-            db.add_all([
-                DocumentChunk(
-                    document_id=document_id,
-                    chunk_index=chunk.index,
-                    content=chunk.content,
-                    source_locator=chunk.source_locator,
-                    embedding=vector,
-                )
-                for chunk, vector in zip(chunks, vectors, strict=True)
-            ])
+            db.add_all(
+                [
+                    DocumentChunk(
+                        document_id=document_id,
+                        chunk_index=chunk.index,
+                        content=chunk.content,
+                        source_locator=chunk.source_locator,
+                        embedding=vector,
+                    )
+                    for chunk, vector in zip(chunks, vectors, strict=True)
+                ]
+            )
             document.content_text = "\n\n".join(section.text for section in sections)
             document.chunk_count = len(chunks)
             document.status = "ready"

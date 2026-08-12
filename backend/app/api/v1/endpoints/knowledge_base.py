@@ -46,8 +46,13 @@ router = APIRouter()
 
 def _response(kb, access, count):
     return KnowledgeBaseResponse(
-        id=kb.id, name=kb.name, description=kb.description or "", access_level=access,
-        document_count=count, created_at=kb.created_at, updated_at=kb.updated_at,
+        id=kb.id,
+        name=kb.name,
+        description=kb.description or "",
+        access_level=access,
+        document_count=count,
+        created_at=kb.created_at,
+        updated_at=kb.updated_at,
     )
 
 
@@ -102,8 +107,11 @@ async def acl_list_endpoint(
 
 @router.put("/{kb_id}/acl/{subject_id}", response_model=ACLResponse)
 async def acl_upsert_endpoint(
-    kb_id: UUID, subject_id: UUID, request: ACLUpsert,
-    user: User = Depends(require_roles("admin", "user")), db: AsyncSession = Depends(get_db),
+    kb_id: UUID,
+    subject_id: UUID,
+    request: ACLUpsert,
+    user: User = Depends(require_roles("admin", "user")),
+    db: AsyncSession = Depends(get_db),
 ):
     entry, username = await upsert_acl(db, kb_id, user.id, subject_id, request.access_level)
     return ACLResponse(
@@ -138,10 +146,15 @@ async def upload_endpoint(
     document_id = uuid4()
     document = Document(
         id=document_id,
-        knowledge_base_id=kb_id, filename=file.filename or "unknown",
-        file_type=file.content_type, storage_uri="", checksum="",
-        parser_version=settings.PARSER_VERSION, embedding_model=settings.EMBEDDING_MODEL,
-        embedding_dim=settings.EMBEDDING_DIM, status="pending",
+        knowledge_base_id=kb_id,
+        filename=file.filename or "unknown",
+        file_type=file.content_type,
+        storage_uri="",
+        checksum="",
+        parser_version=settings.PARSER_VERSION,
+        embedding_model=settings.EMBEDDING_MODEL,
+        embedding_dim=settings.EMBEDDING_DIM,
+        status="pending",
     )
     storage = LocalFileStorage(Path(settings.UPLOAD_DIR), settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024)
     try:
@@ -190,8 +203,10 @@ async def list_documents_endpoint(
 
 @router.get("/{kb_id}/documents/{document_id}", response_model=DocumentResponse)
 async def get_document_endpoint(
-    kb_id: UUID, document_id: UUID,
-    user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db),
+    kb_id: UUID,
+    document_id: UUID,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     await require_kb_access(db, kb_id, user.id, "viewer")
     document = await db.get(Document, document_id)
@@ -202,8 +217,10 @@ async def get_document_endpoint(
 
 @router.post("/{kb_id}/search", response_model=list[SearchHitResponse])
 async def search_endpoint(
-    kb_id: UUID, request: SearchRequest,
-    user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db),
+    kb_id: UUID,
+    request: SearchRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     hits = await search_chunks(db, kb_id, user.id, request.query, top_k=request.top_k)
     return [SearchHitResponse(**hit.__dict__) for hit in hits]
@@ -211,8 +228,10 @@ async def search_endpoint(
 
 @router.post("/{kb_id}/ask", response_model=AnswerResponse)
 async def ask_endpoint(
-    kb_id: UUID, request: QuestionRequest,
-    user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db),
+    kb_id: UUID,
+    request: QuestionRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     answer = await answer_question(db, kb_id, user, request.question, top_k=request.top_k)
     return AnswerResponse(

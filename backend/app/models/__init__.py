@@ -127,9 +127,7 @@ class AgentRun(Base):
     created_at = Column(
         DateTime(timezone=True), default=utcnow, server_default="now()", nullable=False
     )
-    updated_at = Column(
-        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
-    )
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
     __table_args__ = (
         CheckConstraint(
             "status IN ('running','waiting_confirmation','completed','limit_reached','failed')",
@@ -166,9 +164,7 @@ class ToolCall(Base):
     created_at = Column(
         DateTime(timezone=True), default=utcnow, server_default="now()", nullable=False
     )
-    updated_at = Column(
-        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
-    )
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
     __table_args__ = (
         CheckConstraint("side_effect IN ('read','write')", name="ck_tool_calls_side_effect"),
         CheckConstraint(

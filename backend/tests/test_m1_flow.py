@@ -1,10 +1,11 @@
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
+from uuid import uuid4
 
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
 
+from app.agent.loop import AgentTurnResult
 from app.models import AuditLog
 
 
@@ -27,8 +28,12 @@ async def test_m1_core_flow(client: AsyncClient, db_session):
     conversation_id = conversation.json()["id"]
 
     with patch(
-        "app.services.chat_service.start_agent_turn",
-        new=AsyncMock(return_value=SimpleNamespace(answer="assistant reply")),
+        "app.api.v1.endpoints.chat.start_agent_turn",
+        new=AsyncMock(
+            return_value=AgentTurnResult(
+                run_id=uuid4(), status="completed", answer="assistant reply"
+            )
+        ),
     ):
         for content in ("first", "second"):
             response = await client.post(
@@ -37,7 +42,8 @@ async def test_m1_core_flow(client: AsyncClient, db_session):
                 headers=headers,
             )
             assert response.status_code == 201
-            assert response.json()["messages"][-1]["content"] == "assistant reply"
+            # M3 contract: AgentTurnResponse exposes the assistant answer at top level.
+            assert response.json()["answer"] == "assistant reply"
 
     messages = await client.get(
         f"/api/v1/chat/conversations/{conversation_id}/messages", headers=headers

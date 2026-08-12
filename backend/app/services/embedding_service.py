@@ -28,7 +28,7 @@ async def embed_texts(
         client = AsyncOpenAI(api_key=settings.LLM_API_KEY, base_url=settings.LLM_BASE_URL or None)
     result: list[list[float]] = []
     for start in range(0, len(texts), batch_size or settings.EMBEDDING_BATCH_SIZE):
-        batch = texts[start:start + (batch_size or settings.EMBEDDING_BATCH_SIZE)]
+        batch = texts[start : start + (batch_size or settings.EMBEDDING_BATCH_SIZE)]
         response = await client.embeddings.create(
             model=settings.EMBEDDING_MODEL, input=batch, dimensions=settings.EMBEDDING_DIM
         )

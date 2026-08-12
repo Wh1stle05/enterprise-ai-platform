@@ -1,10 +1,16 @@
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
+from uuid import uuid4
 
 from httpx import AsyncClient
 
+from app.agent.loop import AgentTurnResult
+
 REGISTER_URL = "/api/v1/auth/register"
 CONVERSATIONS_URL = "/api/v1/chat/conversations"
+
+
+def _turn(answer: str = "pong") -> AgentTurnResult:
+    return AgentTurnResult(run_id=uuid4(), status="completed", answer=answer, step_count=1)
 
 
 class TestConversations:
@@ -43,8 +49,8 @@ class TestConversations:
         headers = await self._auth_header(client)
         conv_id = (await client.post(CONVERSATIONS_URL, json={}, headers=headers)).json()["id"]
         with patch(
-            "app.services.chat_service.start_agent_turn",
-            new=AsyncMock(return_value=SimpleNamespace(answer="pong")),
+            "app.api.v1.endpoints.chat.start_agent_turn",
+            new=AsyncMock(return_value=_turn()),
         ):
             resp = await client.post(
                 f"{CONVERSATIONS_URL}/{conv_id}/messages",
@@ -52,7 +58,19 @@ class TestConversations:
                 headers=headers,
             )
         assert resp.status_code == 201
-        assert [m["role"] for m in resp.json()["messages"]] == ["user", "assistant"]
+        # M3 contract: AgentTurnResponse, not the old MessageSendResponse.messages.
+        data = resp.json()
+        assert set(data) == {"run_id", "status", "answer", "tool_call", "step_count", "elapsed_ms"}
+        assert data["answer"] == "pong"
+        assert data["status"] == "completed"
+        assert data["run_id"]
+        # Both messages must be persisted and visible via GET /messages.
+        messages = await client.get(f"{CONVERSATIONS_URL}/{conv_id}/messages", headers=headers)
+        assert messages.status_code == 200
+        assert [(m["role"], m["content"]) for m in messages.json()] == [
+            ("user", "hello"),
+            ("assistant", "pong"),
+        ]
 
     async def test_list_conversations(self, client: AsyncClient):
         headers = await self._auth_header(client)
@@ -122,8 +140,8 @@ class TestMessages:
         headers = await self._auth_header(client, suffix="turns")
         conv_id = await self._create_conversation(client, headers)
         with patch(
-            "app.services.chat_service.start_agent_turn",
-            new=AsyncMock(return_value=SimpleNamespace(answer="pong")),
+            "app.api.v1.endpoints.chat.start_agent_turn",
+            new=AsyncMock(return_value=_turn()),
         ) as agent:
             first = await client.post(
                 f"{CONVERSATIONS_URL}/{conv_id}/messages",
@@ -148,8 +166,8 @@ class TestMessages:
         headers = await self._auth_header(client, suffix="history-cap")
         conv_id = await self._create_conversation(client, headers)
         with patch(
-            "app.services.chat_service.start_agent_turn",
-            new=AsyncMock(return_value=SimpleNamespace(answer="pong")),
+            "app.api.v1.endpoints.chat.start_agent_turn",
+            new=AsyncMock(return_value=_turn()),
         ) as agent:
             for index in range(11):
                 response = await client.post(

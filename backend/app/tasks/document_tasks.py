@@ -13,4 +13,4 @@ def process_document_task(self, document_id: str) -> None:
         if self.request.retries >= self.max_retries:
             asyncio.run(mark_document_failed(UUID(document_id), exc))
             raise
-        raise self.retry(exc=exc, countdown=2 ** self.request.retries)
+        raise self.retry(exc=exc, countdown=2**self.request.retries)

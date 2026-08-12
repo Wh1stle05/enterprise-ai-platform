@@ -86,28 +86,38 @@ async def send_message_endpoint(
         if conversation is None:
             raise HTTPException(status_code=404, detail="Conversation not found")
         history_rows = (
-            await db.execute(
-                select(Message)
-                .where(Message.conversation_id == conversation_uuid)
-                .order_by(Message.created_at.desc(), Message.id.desc())
-                .limit(20)
+            (
+                await db.execute(
+                    select(Message)
+                    .where(Message.conversation_id == conversation_uuid)
+                    .order_by(Message.created_at.desc(), Message.id.desc())
+                    .limit(20)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         db.add(Message(conversation_id=conversation_uuid, role="user", content=req.content))
         await db.flush()
+        # History passed to the agent must include the current user message as the
+        # last entry and never exceed 20 messages: at most 19 prior messages + current.
+        prior_messages = list(reversed(history_rows))
+        history = [
+            {"role": message.role, "content": message.content} for message in prior_messages[-19:]
+        ]
+        history.append({"role": "user", "content": req.content})
         result = await start_agent_turn(
             db,
             build_default_registry(),
             conversation_uuid,
             user.id,
             req.content,
-            history=[
-                {"role": message.role, "content": message.content}
-                for message in reversed(history_rows)
-            ],
+            history=history,
         )
         if result.answer:
-            db.add(Message(conversation_id=conversation_uuid, role="assistant", content=result.answer))
+            db.add(
+                Message(conversation_id=conversation_uuid, role="assistant", content=result.answer)
+            )
         conversation.updated_at = datetime.now(timezone.utc)
         await db.flush()
     except LLMConfigurationError:
@@ -119,9 +129,7 @@ async def send_message_endpoint(
     return map_agent_turn(result)
 
 
-@router.get(
-    "/conversations/{conversation_id}/tool-calls", response_model=list[ToolCallResponse]
-)
+@router.get("/conversations/{conversation_id}/tool-calls", response_model=list[ToolCallResponse])
 async def list_tool_calls_endpoint(
     conversation_id: str,
     user: User = Depends(get_current_user),
@@ -151,9 +159,7 @@ async def list_tool_calls_endpoint(
     return [map_tool_call(call) for call in calls]
 
 
-async def _run_id_for_tool_call(
-    db: AsyncSession, tool_call_id: UUID, user_id: UUID
-) -> UUID:
+async def _run_id_for_tool_call(db: AsyncSession, tool_call_id: UUID, user_id: UUID) -> UUID:
     run_id = (
         await db.execute(
             select(AgentRun.id)
@@ -166,9 +172,7 @@ async def _run_id_for_tool_call(
     return run_id
 
 
-@router.post(
-    "/tool-calls/{tool_call_id}/decision", response_model=AgentTurnResponse
-)
+@router.post("/tool-calls/{tool_call_id}/decision", response_model=AgentTurnResponse)
 async def decide_tool_call_endpoint(
     tool_call_id: str,
     req: ToolDecisionRequest,

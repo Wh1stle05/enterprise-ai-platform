@@ -39,33 +39,46 @@ class RAGCitationError(RuntimeError):
 
 
 async def answer_question(
-    db: AsyncSession, kb_id: UUID, user: User, question: str, *, top_k: int = 5,
-    searcher=search_chunks, completer=complete_chat,
+    db: AsyncSession,
+    kb_id: UUID,
+    user: User,
+    question: str,
+    *,
+    top_k: int = 5,
+    searcher=search_chunks,
+    completer=complete_chat,
 ) -> RAGAnswer:
     hits: list[SearchHit] = await searcher(db, kb_id, user.id, question, top_k=top_k)
     evidence = [hit for hit in hits if hit.score >= settings.RETRIEVAL_MIN_SCORE]
     if not evidence:
         answer = RAGAnswer(NO_EVIDENCE_MESSAGE, [], True)
-        await record_audit(db, action_type="knowledge_query", user_id=user.id,
-                           input_data=question, output={"kb_id": kb_id, "no_evidence": True,
-                           "citation_coverage": 0.0}, tool_used="knowledge_rag")
+        await record_audit(
+            db,
+            action_type="knowledge_query",
+            user_id=user.id,
+            input_data=question,
+            output={"kb_id": kb_id, "no_evidence": True, "citation_coverage": 0.0},
+            tool_used="knowledge_rag",
+        )
         return answer
     sources = "\n\n".join(
         f"[S{i}] filename={hit.filename} locator={hit.source_locator} "
         f"chunk_id={hit.chunk_id}\n{hit.content}"
         for i, hit in enumerate(evidence, 1)
     )
-    answer_text = await completer([
-        {
-            "role": "system",
-            "content": (
-                "Answer only from the supplied sources. Cite every factual claim using "
-                "supplied labels. Never invent labels. If evidence is insufficient "
-                "return the exact fallback."
-            ),
-        },
-        {"role": "user", "content": f"Question: {question}\n\nSources:\n{sources}"},
-    ])
+    answer_text = await completer(
+        [
+            {
+                "role": "system",
+                "content": (
+                    "Answer only from the supplied sources. Cite every factual claim using "
+                    "supplied labels. Never invent labels. If evidence is insufficient "
+                    "return the exact fallback."
+                ),
+            },
+            {"role": "user", "content": f"Question: {question}\n\nSources:\n{sources}"},
+        ]
+    )
     if answer_text == NO_EVIDENCE_MESSAGE:
         return RAGAnswer(answer_text, [], True)
     labels = []
@@ -81,8 +94,17 @@ async def answer_question(
         if not 1 <= index <= len(evidence):
             raise RAGCitationError("Answer contains an unknown citation")
         hit = evidence[index - 1]
-        citations.append(Citation(label, hit.chunk_id, hit.document_id, hit.filename,
-                                  hit.source_locator, hit.chunk_index, hit.score))
+        citations.append(
+            Citation(
+                label,
+                hit.chunk_id,
+                hit.document_id,
+                hit.filename,
+                hit.source_locator,
+                hit.chunk_index,
+                hit.score,
+            )
+        )
     await record_audit(
         db,
         action_type="knowledge_query",

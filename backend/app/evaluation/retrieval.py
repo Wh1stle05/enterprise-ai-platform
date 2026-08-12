@@ -45,7 +45,9 @@ def summarize(cases: list[EvaluationResult], k: int) -> EvaluationSummary:
     answered = [case for case in cases if not case.no_evidence]
     covered = [case for case in answered if case.cited & case.expected]
     return EvaluationSummary(
-        len(cases), sum(recalls) / len(recalls), len(covered) / len(answered) if answered else 0.0,
+        len(cases),
+        sum(recalls) / len(recalls),
+        len(covered) / len(answered) if answered else 0.0,
         sum(case.no_evidence for case in cases) / len(cases),
     )
 
@@ -61,10 +63,12 @@ async def evaluate(
     for case in cases:
         retrieved = await searcher(case, top_k=case.top_k or top_k)
         answer = await answerer(case, top_k=case.top_k or top_k)
-        results.append(EvaluationResult(
-            expected={str(item) for item in case.expected_chunk_ids},
-            retrieved=[str(item.chunk_id) for item in retrieved],
-            cited={str(item.chunk_id) for item in answer.citations},
-            no_evidence=answer.no_evidence,
-        ))
+        results.append(
+            EvaluationResult(
+                expected={str(item) for item in case.expected_chunk_ids},
+                retrieved=[str(item.chunk_id) for item in retrieved],
+                cited={str(item.chunk_id) for item in answer.citations},
+                no_evidence=answer.no_evidence,
+            )
+        )
     return results

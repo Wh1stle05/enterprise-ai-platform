@@ -3,6 +3,7 @@ fastapi==0.115.6
 uvicorn[standard]==0.34.0
 pydantic==2.10.3
 pydantic-settings==2.7.0
+jsonschema==4.23.0  # runtime dep: app/agent/registry.py (Draft202012Validator)
 
 # ---- Database ----
 sqlalchemy==2.0.36
@@ -16,6 +17,7 @@ pgvector==0.3.6
 # ---- Auth ----
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
+bcrypt==4.0.1  # passlib 1.7.4 compatibility pin: bcrypt>=5.0 removed bcrypt.__about__ and breaks passlib; keep 4.0.1 until pwdlib migration
 python-multipart==0.0.18
 
 # ---- AI / RAG ----
