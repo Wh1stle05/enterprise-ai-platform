@@ -47,6 +47,13 @@ class Settings(BaseSettings):
     ]
 
     # Embedding
+    # Independent embedding upstream. When EMBEDDING_API_KEY / EMBEDDING_BASE_URL
+    # are blank, the embedding client falls back to LLM_API_KEY / LLM_BASE_URL;
+    # if both are blank the OpenAI SDK default endpoint is used. Point these at
+    # the AI-Gateway /v1 endpoint for Gateway mode (e.g.
+    # EMBEDDING_BASE_URL=http://ai-gateway:8080/v1 with a Gateway service key).
+    EMBEDDING_API_KEY: Optional[str] = None
+    EMBEDDING_BASE_URL: Optional[str] = None
     # Direct-connect value; switch to "embed/text-embedding-3-small" only after
     # AI-Gateway embedding routing lands (T2-03).
     EMBEDDING_MODEL: str = "text-embedding-3-small"

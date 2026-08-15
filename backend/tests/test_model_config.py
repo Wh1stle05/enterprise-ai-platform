@@ -29,6 +29,47 @@ def test_env_override_keeps_qwen_logical_name_verbatim(monkeypatch):
     assert fresh.LLM_MODEL == "chat/qwen2.5-1.5b"
 
 
+def test_embedding_settings_are_optional_and_do_not_pollute_chat(monkeypatch):
+    # Chat-only config must leave embedding settings at their code defaults
+    # (None), so embedding falls back to the LLM upstream.
+    monkeypatch.delenv("EMBEDDING_API_KEY", raising=False)
+    monkeypatch.delenv("EMBEDDING_BASE_URL", raising=False)
+    monkeypatch.setenv("LLM_API_KEY", "llm-key")
+    monkeypatch.setenv("LLM_BASE_URL", "https://llm.example/v1")
+    fresh = Settings(_env_file=None)
+    assert fresh.EMBEDDING_API_KEY is None
+    assert fresh.EMBEDDING_BASE_URL is None
+    assert fresh.LLM_API_KEY == "llm-key"
+    assert fresh.LLM_BASE_URL == "https://llm.example/v1"
+
+
+def test_independent_embedding_settings_take_priority(monkeypatch):
+    # When both LLM and embedding config are present, embedding keeps its own
+    # upstream and the LLM values stay untouched.
+    monkeypatch.setenv("EMBEDDING_API_KEY", "embed-key")
+    monkeypatch.setenv("EMBEDDING_BASE_URL", "https://embed.example/v1")
+    monkeypatch.setenv("LLM_API_KEY", "llm-key")
+    monkeypatch.setenv("LLM_BASE_URL", "https://llm.example/v1")
+    fresh = Settings(_env_file=None)
+    assert fresh.EMBEDDING_API_KEY == "embed-key"
+    assert fresh.EMBEDDING_BASE_URL == "https://embed.example/v1"
+    assert fresh.LLM_API_KEY == "llm-key"
+    assert fresh.LLM_BASE_URL == "https://llm.example/v1"
+
+
+def test_embedding_env_does_not_pollute_chat_config(monkeypatch):
+    # Setting only embedding variables must not make chat read them.
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    monkeypatch.delenv("LLM_BASE_URL", raising=False)
+    monkeypatch.setenv("EMBEDDING_API_KEY", "embed-key")
+    monkeypatch.setenv("EMBEDDING_BASE_URL", "https://embed.example/v1")
+    fresh = Settings(_env_file=None)
+    assert fresh.LLM_API_KEY is None
+    assert fresh.LLM_BASE_URL is None
+    assert fresh.EMBEDDING_API_KEY == "embed-key"
+    assert fresh.EMBEDDING_BASE_URL == "https://embed.example/v1"
+
+
 class FakeCompletions:
     def __init__(self) -> None:
         self.calls: list[dict] = []
