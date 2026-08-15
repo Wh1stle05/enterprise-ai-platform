@@ -39,6 +39,7 @@ celery==5.4.0
 tenacity==9.0.0
 python-dotenv==1.0.1
 loguru==0.7.3
+prometheus-client==0.26.0  # P3-01: independent registry for /metrics
 
 # ---- Testing ----
 pytest==8.3.4

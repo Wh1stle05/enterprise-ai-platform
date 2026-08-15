@@ -15,6 +15,7 @@ dependencies = [
     "pgvector>=0.3",
     "openai>=1.58",
     "pydantic-settings>=2.7",
+    "prometheus-client>=0.26",
 ]
 
 [project.optional-dependencies]

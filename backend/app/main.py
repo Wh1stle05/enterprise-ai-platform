@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from contextlib import asynccontextmanager
 from uuid import uuid4
 
@@ -8,6 +9,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
+from prometheus_client import generate_latest
 from sqlalchemy import text
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -23,6 +25,12 @@ from app.services.embedding_service import (
 )
 from app.services.errors import build_error_payload
 from app.services.llm_service import LLMConfigurationError
+from app.services.metrics import (
+    METRICS_PATH,
+    REGISTRY,
+    http_route_label,
+    record_http_request,
+)
 
 api_logger = logging.getLogger("app.api")
 
@@ -80,6 +88,32 @@ app = FastAPI(
     docs_url="/docs",
     lifespan=lifespan,
 )
+
+
+@app.middleware("http")
+async def metrics_middleware(request: Request, call_next):
+    """Record low-cardinality HTTP metrics; never count the /metrics scrape.
+
+    The route template is read only after the response has been produced, so
+    matched requests report their template (e.g. ``{kb_id}``) and unmatched
+    requests report ``__unmatched__``. Exceptions raised by inner middleware
+    are still recorded with a best-effort 500 status and then re-raised —
+    metrics must never swallow an error.
+    """
+    if request.url.path == METRICS_PATH:
+        return await call_next(request)
+    method = request.method
+    start = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception:
+        record_http_request(method, http_route_label(request), 500, time.perf_counter() - start)
+        raise
+    record_http_request(
+        method, http_route_label(request), response.status_code, time.perf_counter() - start
+    )
+    return response
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -229,6 +263,15 @@ async def handle_embedding_dimension_error(request: Request, exc: EmbeddingDimen
 
 
 app.include_router(api_router, prefix="/api/v1")
+
+
+@app.get(METRICS_PATH, include_in_schema=False)
+async def metrics_endpoint():
+    """Expose Prometheus text-format metrics; intentionally unauthenticated."""
+    return Response(
+        content=generate_latest(REGISTRY),
+        media_type="text/plain; version=0.0.4; charset=utf-8",
+    )
 
 
 @app.get("/health")

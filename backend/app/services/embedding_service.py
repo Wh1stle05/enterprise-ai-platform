@@ -44,6 +44,8 @@ async def embed_texts(
     batch_size = batch_size or settings.EMBEDDING_BATCH_SIZE
     for start in range(0, len(texts), batch_size):
         batch = texts[start : start + batch_size]
+        # Observe once per batch actually sent; empty input never reaches the loop.
+        EMBEDDING_BATCH_SIZE.observe(len(batch))
         response = await client.embeddings.create(
             model=settings.EMBEDDING_MODEL, input=batch, dimensions=settings.EMBEDDING_DIM
         )

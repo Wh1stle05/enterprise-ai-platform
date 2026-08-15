@@ -1,3 +1,4 @@
+import time
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -8,6 +9,7 @@ from app.core.config import settings
 from app.models import Document, DocumentChunk
 from app.services.embedding_service import embed_texts
 from app.services.knowledge_acl_service import require_kb_access
+from app.services.metrics import RAG_SEARCH_DURATION_SECONDS
 
 
 @dataclass(frozen=True)
@@ -30,29 +32,35 @@ async def search_chunks(
     top_k: int,
     embedder=embed_texts,
 ) -> list[SearchHit]:
-    await require_kb_access(db, kb_id, user_id, "viewer")
-    if not 1 <= top_k <= settings.RETRIEVAL_MAX_TOP_K:
-        raise ValueError("top_k must be between 1 and RETRIEVAL_MAX_TOP_K")
-    query_vector = (await embedder([query]))[0]
-    distance = DocumentChunk.embedding.cosine_distance(query_vector)
-    rows = (
-        await db.execute(
-            select(DocumentChunk, Document.filename, distance.label("distance"))
-            .join(Document)
-            .where(Document.knowledge_base_id == kb_id, Document.status == "ready")
-            .order_by(distance.asc())
-            .limit(top_k)
-        )
-    ).all()
-    return [
-        SearchHit(
-            c.id,
-            c.document_id,
-            filename,
-            c.chunk_index,
-            c.content,
-            c.source_locator,
-            max(-1.0, min(1.0, 1.0 - float(distance_value))),
-        )
-        for c, filename, distance_value in rows
-    ]
+    # Full retrieval duration is recorded with try/finally so failures (access
+    # denial, embedding errors, DB errors) are still observable.
+    start = time.perf_counter()
+    try:
+        await require_kb_access(db, kb_id, user_id, "viewer")
+        if not 1 <= top_k <= settings.RETRIEVAL_MAX_TOP_K:
+            raise ValueError("top_k must be between 1 and RETRIEVAL_MAX_TOP_K")
+        query_vector = (await embedder([query]))[0]
+        distance = DocumentChunk.embedding.cosine_distance(query_vector)
+        rows = (
+            await db.execute(
+                select(DocumentChunk, Document.filename, distance.label("distance"))
+                .join(Document)
+                .where(Document.knowledge_base_id == kb_id, Document.status == "ready")
+                .order_by(distance.asc())
+                .limit(top_k)
+            )
+        ).all()
+        return [
+            SearchHit(
+                c.id,
+                c.document_id,
+                filename,
+                c.chunk_index,
+                c.content,
+                c.source_locator,
+                max(-1.0, min(1.0, 1.0 - float(distance_value))),
+            )
+            for c, filename, distance_value in rows
+        ]
+    finally:
+        RAG_SEARCH_DURATION_SECONDS.observe(time.perf_counter() - start)
