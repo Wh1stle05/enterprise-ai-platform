@@ -49,6 +49,22 @@ services:
       LLM_API_KEY: "${OPENAI_API_KEY:-}"
       LLM_BASE_URL: "${LLM_BASE_URL:-}"
       LLM_MODEL: "${LLM_MODEL:-gpt-4o-mini}"
+      EMBEDDING_API_KEY: "${EMBEDDING_API_KEY:-${OPENAI_API_KEY:-}}"
+      EMBEDDING_BASE_URL: "${EMBEDDING_BASE_URL:-${LLM_BASE_URL:-}}"
+      EMBEDDING_MODEL: "${EMBEDDING_MODEL:-text-embedding-3-small}"
+      EMBEDDING_DIM: "1536"
+      CHUNK_SIZE: "${CHUNK_SIZE:-1000}"
+      CHUNK_OVERLAP: "${CHUNK_OVERLAP:-200}"
+      EMBEDDING_BATCH_SIZE: "${EMBEDDING_BATCH_SIZE:-64}"
+      RETRIEVAL_DEFAULT_TOP_K: "${RETRIEVAL_DEFAULT_TOP_K:-5}"
+      RETRIEVAL_MAX_TOP_K: "${RETRIEVAL_MAX_TOP_K:-20}"
+      RETRIEVAL_MIN_SCORE: "${RETRIEVAL_MIN_SCORE:-0.35}"
+      UPLOAD_DIR: "/app/uploads"
+      AUDIT_RETENTION_DAYS: "${AUDIT_RETENTION_DAYS:-90}"
+      AGENT_MAX_STEPS: "${AGENT_MAX_STEPS:-6}"
+      AGENT_MAX_ACTIVE_SECONDS: "${AGENT_MAX_ACTIVE_SECONDS:-20}"
+      TOOL_CONFIRMATION_TTL_SECONDS: "${TOOL_CONFIRMATION_TTL_SECONDS:-300}"
+      AGENT_TOOL_WHITELIST: "${AGENT_TOOL_WHITELIST:-[\"knowledge_search\",\"create_work_ticket\",\"query_inventory\",\"get_leave_balance\",\"submit_expense\"]}"
     depends_on:
       postgres:
         condition: service_healthy
@@ -59,16 +75,52 @@ services:
     restart: unless-stopped
 
   # ============================================================
-  # Frontend (placeholder — uncomment when ready)
+  # Celery document worker
   # ============================================================
-  # frontend:
-  #   build:
-  #     context: ./frontend
-  #     dockerfile: Dockerfile
-  #   ports:
-  #     - "3000:80"
-  #   depends_on:
-  #     - backend
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: celery -A app.worker.celery_app worker --loglevel=INFO --concurrency=2
+    environment:
+      DATABASE_URL: "postgresql+asyncpg://postgres:postgres@postgres:5432/enterprise_ai"
+      DATABASE_URL_SYNC: "postgresql://postgres:postgres@postgres:5432/enterprise_ai"
+      REDIS_URL: "redis://redis:6379/0"
+      LLM_API_KEY: "${OPENAI_API_KEY:-}"
+      LLM_BASE_URL: "${LLM_BASE_URL:-}"
+      EMBEDDING_API_KEY: "${EMBEDDING_API_KEY:-${OPENAI_API_KEY:-}}"
+      EMBEDDING_BASE_URL: "${EMBEDDING_BASE_URL:-${LLM_BASE_URL:-}}"
+      EMBEDDING_MODEL: "${EMBEDDING_MODEL:-text-embedding-3-small}"
+      EMBEDDING_DIM: "1536"
+      CHUNK_SIZE: "${CHUNK_SIZE:-1000}"
+      CHUNK_OVERLAP: "${CHUNK_OVERLAP:-200}"
+      EMBEDDING_BATCH_SIZE: "${EMBEDDING_BATCH_SIZE:-64}"
+      RETRIEVAL_DEFAULT_TOP_K: "${RETRIEVAL_DEFAULT_TOP_K:-5}"
+      RETRIEVAL_MAX_TOP_K: "${RETRIEVAL_MAX_TOP_K:-20}"
+      RETRIEVAL_MIN_SCORE: "${RETRIEVAL_MIN_SCORE:-0.35}"
+      UPLOAD_DIR: "/app/uploads"
+      AUDIT_RETENTION_DAYS: "${AUDIT_RETENTION_DAYS:-90}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - uploads:/app/uploads
+    restart: unless-stopped
+
+  # ============================================================
+  # Frontend
+  # ============================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_started
 
 volumes:
   pgdata:

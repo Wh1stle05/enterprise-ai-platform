@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "enterprise-ai-platform"
 version = "0.1.0"
@@ -11,6 +15,7 @@ dependencies = [
     "pgvector>=0.3",
     "openai>=1.58",
     "pydantic-settings>=2.7",
+    "prometheus-client>=0.26",
 ]
 
 [project.optional-dependencies]
@@ -19,6 +24,9 @@ dev = [
     "pytest-asyncio>=0.24",
     "httpx>=0.28",
     "alembic>=1.14",
+    "aiosqlite>=0.20",
+    "email-validator>=2.0",
+    "jsonschema>=4.23",
 ]
 
 [tool.ruff]
@@ -31,3 +39,8 @@ select = ["E", "F", "I", "N", "W"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = ["postgres: requires PostgreSQL with pgvector"]
+
+[tool.setuptools.packages.find]
+include = ["app*"]

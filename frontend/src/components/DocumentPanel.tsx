@@ -1,0 +1,5 @@
+import type { Document } from '../types/knowledge'
+
+export default function DocumentPanel({ documents, canUpload, onUpload }: { documents: Document[]; canUpload: boolean; onUpload: (file: File) => void }) {
+  return <section className="border-b border-gray-200 p-5"><div className="mb-3 flex items-center justify-between"><h2 className="font-semibold">Documents</h2>{canUpload && <label className="cursor-pointer rounded bg-blue-600 px-3 py-2 text-sm text-white">Upload<input className="hidden" type="file" accept=".pdf,.docx,.xlsx,.md" onChange={(e) => e.target.files?.[0] && onUpload(e.target.files[0])} /></label>}</div>{documents.length === 0 ? <p className="text-sm text-gray-500">No documents yet.</p> : <ul className="divide-y divide-gray-100">{documents.map((doc) => <li key={doc.id} className="flex items-center justify-between py-2 text-sm"><span>{doc.filename}</span><span className={doc.status === 'failed' ? 'text-red-600' : 'text-gray-500'}>{doc.status}{doc.error_message && `: ${doc.error_message}`}</span></li>)}</ul>}</section>
+}
